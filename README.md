@@ -4,8 +4,8 @@ Policy Administration System for a South African short-term insurance broker:
 motor, home and commercial property, quoted across several insurers.
 
 Built so far: the **product model and rating engine**, **quote, referral
-and bind**, **PostgreSQL storage**, and the **HTTP API** the broker portal
-will use. Later slices add documents, endorsements, cancellations and
+and bind**, **PostgreSQL storage**, the **HTTP API**, and the **broker portal**
+(`web/`). Later slices add documents, endorsements, cancellations and
 renewals (see the design doc).
 
 ## How rating works
@@ -57,13 +57,18 @@ and made-up rates, used for tests.
 ## HTTP API
 
 `npm run build && npm start` runs the API (Fastify). Every route except
-`/health` needs a bearer token from your identity provider (OIDC), with a
-`role` claim of `broker`, `underwriter` or `admin`, plus `broker_id` or
-`underwriter_id`. This server never stores passwords.
+`/health` needs a bearer access token from Microsoft Entra ID (any OIDC
+provider works). This server never stores passwords.
+
+- **Role** comes from the token's app roles (`Broker`, `Underwriter`,
+  `Admin`), assigned to people in Entra.
+- **Which broker or underwriter** a person acts for is linked here by an admin
+  with `PUT /user-links` (`{ "subject": "<Entra object id>", "brokerId": "..." }`).
 
 | Who | Route | Does |
 | --- | --- | --- |
 | admin | `POST /brokers`, `POST /underwriters` | Onboard a broker (FSP number) or an insurer's underwriter |
+| admin | `PUT /user-links` | Link a signed-in person to their broker or underwriter |
 | anyone | `GET /products?line=motor` | Products on sale for a line |
 | broker | `POST /clients`, `GET /clients` | Add a client; list own clients |
 | broker | `POST /quotes`, `GET /quotes`, `GET /quotes/:id` | Quote every insurer; list and view own quotes |
@@ -75,6 +80,21 @@ and made-up rates, used for tests.
 
 Environment: `DATABASE_URL`, `AUTH_ISSUER`, `AUTH_AUDIENCE`, `AUTH_JWKS_URL`,
 optional `PORT` (3000) and `PRODUCTS_DIR` (`./products`). Migrations run on start.
+
+## Broker portal
+
+`web/` is a React app. Brokers add clients, capture a motor quote, compare
+insurers, refer and bind; underwriters see their insurer's referral queue and
+approve or decline with a note. Sign-in is Microsoft Entra: see
+[docs/entra-setup.md](docs/entra-setup.md).
+
+Try it locally without Entra:
+
+```sh
+npm ci && npm run build && npm run dev:api   # API + in-memory database, prints tokens
+cd web && npm ci
+VITE_DEV_TOKEN=<broker token> npm run dev    # http://localhost:5173
+```
 
 ## Commands
 

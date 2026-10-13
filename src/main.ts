@@ -21,10 +21,13 @@ const db = fromPool(new pg.Pool({ connectionString: env("DATABASE_URL") }));
 await migrate(db, join(root, "db/migrations"));
 
 const catalog = new ProductCatalog(loadProducts(env("PRODUCTS_DIR", join(root, "products"))));
+const service = new QuoteService(db, catalog, { now: () => new Date() });
 const app = buildApp({
-  service: new QuoteService(db, catalog, { now: () => new Date() }),
+  service,
   catalog,
-  auth: oidcAuthenticator(env("AUTH_ISSUER"), env("AUTH_AUDIENCE"), env("AUTH_JWKS_URL")),
+  auth: oidcAuthenticator(env("AUTH_ISSUER"), env("AUTH_AUDIENCE"), env("AUTH_JWKS_URL"), (subject) =>
+    service.resolveLink(subject),
+  ),
   logger: true,
 });
 

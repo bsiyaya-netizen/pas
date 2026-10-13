@@ -76,7 +76,7 @@ describe("rate", () => {
     const tooYoung = { coverages: [], risk: { ...risk, driver: { age: 17, claimsLast3Years: 0 } } };
     expect(() => rate(productA, tooYoung)).toThrow(/No row in table "driverAge"/);
 
-    expect(() => rate(productA, { coverages: ["boat"], risk })).toThrow(/not offered/);
+    expect(() => rate(productA, { coverages: ["boat"], risk })).toThrow(/does not offer/);
   });
 });
 

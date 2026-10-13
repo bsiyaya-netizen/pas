@@ -62,7 +62,7 @@ export function rate(product: Product, request: RatingRequest): RatingResult {
   const known = new Set(product.coverages.map((c) => c.code));
   for (const code of request.coverages) {
     if (!known.has(code)) {
-      throw new RatingError(`Coverage "${code}" is not offered by ${product.id}`, {
+      throw new RatingError(`${product.insurer} does not offer the "${code}" cover`, {
         coverage: code,
       });
     }
