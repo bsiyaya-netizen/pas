@@ -18,8 +18,44 @@ export const userManager = new UserManager({
   userStore: new WebStorageStateStore({ store: window.sessionStorage }),
 });
 
+/**
+ * Demo mode (`npm run demo`) signs in with sample tokens for each role instead
+ * of the identity provider. Like VITE_DEV_TOKEN, Vite strips it from production builds.
+ */
+const demoTokens: Record<string, string> | undefined =
+  import.meta.env.DEV && import.meta.env.VITE_DEMO_TOKENS ? JSON.parse(import.meta.env.VITE_DEMO_TOKENS) : undefined;
+const DEMO_ROLE_KEY = "pas-demo-role";
+
+export const demoRoles: string[] = demoTokens ? Object.keys(demoTokens) : [];
+
+export function demoSignIn(role: string): void {
+  window.sessionStorage.setItem(DEMO_ROLE_KEY, role);
+  window.location.hash = "";
+  window.location.reload();
+}
+
+export function signOut(): void {
+  if (demoTokens) {
+    window.sessionStorage.removeItem(DEMO_ROLE_KEY);
+    window.location.hash = "";
+    window.location.reload();
+  } else {
+    void userManager.signoutRedirect();
+  }
+}
+
 /** Finishes a sign-in redirect if the URL carries one, then returns the signed-in user. */
 export async function currentUser(): Promise<User | null> {
+  if (demoTokens) {
+    const role = window.sessionStorage.getItem(DEMO_ROLE_KEY);
+    const token = role ? demoTokens[role] : undefined;
+    if (!role || !token) return null;
+    return new User({
+      access_token: token,
+      token_type: "Bearer",
+      profile: { sub: role, iss: "demo", aud: "demo", exp: 0, iat: 0, name: `Demo ${role}` },
+    });
+  }
   // Local development only: `npm run dev:api` prints tokens to paste into VITE_DEV_TOKEN.
   // Vite strips this branch from production builds.
   if (import.meta.env.DEV && import.meta.env.VITE_DEV_TOKEN) {

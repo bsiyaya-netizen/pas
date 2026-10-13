@@ -1,0 +1,11 @@
+{
+  "name": "PAS demo",
+  "image": "mcr.microsoft.com/devcontainers/javascript-node:22",
+  "postCreateCommand": "npm ci && npm --prefix web ci",
+  "postAttachCommand": "npm run demo",
+  "forwardPorts": [5173, 3000],
+  "portsAttributes": {
+    "5173": { "label": "Broker portal", "onAutoForward": "openBrowser" },
+    "3000": { "label": "API", "onAutoForward": "silent" }
+  }
+}

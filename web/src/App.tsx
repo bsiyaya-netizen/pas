@@ -1,7 +1,7 @@
 import type { User } from "oidc-client-ts";
 import { useEffect, useMemo, useState } from "react";
 import { api } from "./api";
-import { currentUser, roleOf, userManager } from "./auth";
+import { currentUser, demoRoles, demoSignIn, roleOf, signOut, userManager } from "./auth";
 import { Clients } from "./pages/Clients";
 import { Dashboard } from "./pages/Dashboard";
 import { NewQuote } from "./pages/NewQuote";
@@ -30,7 +30,20 @@ export function App() {
       <main className="signin">
         <h1>Broker Portal</h1>
         {error && <p className="error">{error}</p>}
-        <button onClick={() => userManager.signinRedirect()}>Sign in</button>
+        {demoRoles.length > 0 ? (
+          <>
+            <p>This is a demo with sample data. Choose who to sign in as:</p>
+            <div className="inline">
+              {demoRoles.map((role) => (
+                <button key={role} onClick={() => demoSignIn(role)}>
+                  {role.charAt(0).toUpperCase() + role.slice(1)}
+                </button>
+              ))}
+            </div>
+          </>
+        ) : (
+          <button onClick={() => userManager.signinRedirect()}>Sign in</button>
+        )}
       </main>
     );
   }
@@ -77,7 +90,7 @@ function SignedIn({ user }: { user: User }) {
         </nav>
         <span className="who">
           {name}
-          <button className="link" onClick={() => userManager.signoutRedirect()}>
+          <button className="link" onClick={signOut}>
             Sign out
           </button>
         </span>
