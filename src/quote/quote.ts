@@ -175,6 +175,9 @@ export function decideReferral(
   if (!referral || referral.status !== "pending") {
     throw new QuoteError(`${option.insurer} option has no pending referral`);
   }
+  if (underwriter.insurer !== option.insurer) {
+    throw new QuoteError(`${underwriter.name} cannot decide referrals for ${option.insurer}`);
+  }
   if (underwriter.authority < referral.requiredAuthority) {
     throw new QuoteError(
       `${underwriter.name} has authority ${underwriter.authority}; this referral needs ${referral.requiredAuthority}`,

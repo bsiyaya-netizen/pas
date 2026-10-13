@@ -13,6 +13,8 @@ export interface Client {
 export interface Underwriter {
   id: string;
   name: string;
+  /** The insurer this underwriter works for; they only decide its referrals. */
+  insurer: string;
   /** Highest referral authority grade this person may clear. */
   authority: number;
 }

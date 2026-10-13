@@ -74,9 +74,10 @@ export class QuoteService {
 
   async addUnderwriter(input: Omit<Underwriter, "id">): Promise<Underwriter> {
     const underwriter = { id: this.newId(), ...input };
-    await this.db.query("insert into underwriters (id, name, authority) values ($1, $2, $3)", [
+    await this.db.query("insert into underwriters (id, name, insurer, authority) values ($1, $2, $3, $4)", [
       underwriter.id,
       underwriter.name,
+      underwriter.insurer,
       underwriter.authority,
     ]);
     return underwriter;
@@ -123,7 +124,23 @@ export class QuoteService {
     });
   }
 
-  /** Insurer underwriters see referrals from every broker, so this call is not broker-scoped. */
+  /** Open quotes with an option from this underwriter's insurer awaiting a decision, oldest first. */
+  async listPendingReferrals(underwriterId: string): Promise<Quote[]> {
+    const underwriter = await this.underwriter(underwriterId);
+    const { rows } = await this.db.query<{ document: Quote }>(
+      `select document from quotes
+       where status = 'open'
+         and exists (
+           select 1 from jsonb_array_elements(document -> 'options') as o
+           where o -> 'referral' ->> 'status' = 'pending' and o ->> 'insurer' = $1
+         )
+       order by created_at`,
+      [underwriter.insurer],
+    );
+    return rows.map((r) => r.document);
+  }
+
+  /** Underwriters see referrals from every broker, so this call is scoped by insurer, not broker. */
   async decide(
     underwriterId: string,
     quoteId: string,
@@ -131,12 +148,7 @@ export class QuoteService {
     decision: "approved" | "declined",
     note: string,
   ): Promise<Quote> {
-    const { rows } = await this.db.query<{ id: string; name: string; authority: number }>(
-      "select id, name, authority from underwriters where id = $1",
-      [underwriterId],
-    );
-    const underwriter = rows[0];
-    if (!underwriter) throw new NotFoundError(`Underwriter ${underwriterId}`);
+    const underwriter = await this.underwriter(underwriterId);
     return this.db.transaction(async (tx) => {
       const { quote, revision } = await this.loadQuote(tx, quoteId, undefined, true);
       return this.saveQuote(tx, decideReferral(quote, productId, underwriter, decision, note, this.deps), revision);
@@ -191,6 +203,15 @@ export class QuoteService {
     );
     if (!rows[0]) throw new NotFoundError(`Policy ${policyNumber}`);
     return rows[0].document;
+  }
+
+  private async underwriter(underwriterId: string): Promise<Underwriter> {
+    const { rows } = await this.db.query<Underwriter>(
+      "select id, name, insurer, authority from underwriters where id = $1",
+      [underwriterId],
+    );
+    if (!rows[0]) throw new NotFoundError(`Underwriter ${underwriterId}`);
+    return rows[0];
   }
 
   private async broker(brokerId: string): Promise<Broker> {

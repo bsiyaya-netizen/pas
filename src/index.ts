@@ -26,3 +26,7 @@ export { fromPool } from "./db/database.js";
 export type { Database, Queryable } from "./db/database.js";
 export { migrate } from "./db/migrate.js";
 export { ConflictError, NotFoundError, QuoteService } from "./service/quote-service.js";
+export { buildApp } from "./api/app.js";
+export type { AppDeps } from "./api/app.js";
+export { AuthError, jwtAuthenticator, oidcAuthenticator } from "./api/auth.js";
+export type { Actor, Authenticator } from "./api/auth.js";
