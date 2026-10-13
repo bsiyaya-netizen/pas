@@ -1,13 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { fileURLToPath } from "node:url";
-import { loadProducts } from "../src/product/load.js";
 import { ProductCatalog } from "../src/product/catalog.js";
 import { parseProduct, type Product } from "../src/product/schema.js";
 import { rate, RatingError, type RatingRequest } from "../src/rating/engine.js";
 import { compareInsurers } from "../src/rating/compare.js";
-
-const products = loadProducts(fileURLToPath(new URL("../products", import.meta.url)));
-const productA = products.find((p) => p.id === "example-a-motor")!;
+import { products, productA } from "./fixtures.js";
 
 const risk = {
   territory: "gauteng",

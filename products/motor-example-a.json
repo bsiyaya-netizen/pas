@@ -81,5 +81,70 @@
       "mandatory": true,
       "steps": [{ "label": "Flat tariff (illustrative)", "op": "set", "operand": { "const": 12 } }]
     }
-  ]
+  ],
+  "underwriting": {
+    "rules": [
+      {
+        "id": "vehicle-value-max",
+        "message": "Vehicle value above R1 500 000 is outside this product",
+        "outcome": "decline",
+        "when": {
+          "field": "vehicle.value",
+          "op": "gt",
+          "value": 1500000
+        }
+      },
+      {
+        "id": "claims-3-in-3",
+        "message": "Three or more claims in the last 3 years",
+        "outcome": "refer",
+        "authority": 1,
+        "when": {
+          "field": "driver.claimsLast3Years",
+          "op": "gte",
+          "value": 3
+        }
+      },
+      {
+        "id": "high-value-vehicle",
+        "message": "Vehicle value above R800 000",
+        "outcome": "refer",
+        "authority": 2,
+        "when": {
+          "field": "vehicle.value",
+          "op": "gt",
+          "value": 800000
+        }
+      },
+      {
+        "id": "young-driver-business-use",
+        "message": "Driver under 25 using the vehicle for business",
+        "outcome": "refer",
+        "authority": 1,
+        "when": {
+          "all": [
+            {
+              "field": "driver.age",
+              "op": "lt",
+              "value": 25
+            },
+            {
+              "field": "vehicle.use",
+              "op": "eq",
+              "value": "business"
+            }
+          ]
+        }
+      },
+      {
+        "id": "licence-date-missing",
+        "message": "Licence issue date not captured",
+        "outcome": "warn",
+        "when": {
+          "field": "driver.licenceDate",
+          "op": "missing"
+        }
+      }
+    ]
+  }
 }
