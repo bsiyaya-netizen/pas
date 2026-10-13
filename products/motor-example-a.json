@@ -1,0 +1,85 @@
+{
+  "id": "example-a-motor",
+  "insurer": "Example Insurer A",
+  "line": "motor",
+  "name": "Private Motor (illustrative rates, not a real insurer)",
+  "version": 1,
+  "effectiveFrom": "2026-01-01",
+  "currency": "ZAR",
+  "premiumFrequency": "monthly",
+  "tax": { "vatRate": 0.15, "premiumsIncludeVat": true },
+  "commission": { "maxRate": 0.125, "excludedCoverages": ["sasria"] },
+  "minimumPremium": 250,
+  "tables": {
+    "baseRate": {
+      "description": "Annual rate as a fraction of vehicle value",
+      "dimensions": [
+        { "name": "territory", "kind": "exact" },
+        { "name": "use", "kind": "exact" }
+      ],
+      "rows": [
+        { "match": { "territory": "gauteng", "use": "private" }, "value": 0.045 },
+        { "match": { "territory": "gauteng", "use": "business" }, "value": 0.052 },
+        { "match": { "territory": "western_cape", "use": "private" }, "value": 0.038 },
+        { "match": { "territory": "western_cape", "use": "business" }, "value": 0.044 },
+        { "match": { "use": "private" }, "value": 0.035 },
+        { "match": { "use": "business" }, "value": 0.041 }
+      ]
+    },
+    "driverAge": {
+      "dimensions": [{ "name": "age", "kind": "range" }],
+      "rows": [
+        { "match": { "age": { "min": 18, "max": 25 } }, "value": 1.6 },
+        { "match": { "age": { "min": 25, "max": 30 } }, "value": 1.25 },
+        { "match": { "age": { "min": 30, "max": 65 } }, "value": 1.0 },
+        { "match": { "age": { "min": 65 } }, "value": 1.15 }
+      ]
+    },
+    "claimsHistory": {
+      "description": "Claims in the last 3 years",
+      "dimensions": [{ "name": "claims", "kind": "range" }],
+      "rows": [
+        { "match": { "claims": { "max": 1 } }, "value": 0.9 },
+        { "match": { "claims": { "min": 1, "max": 2 } }, "value": 1.1 },
+        { "match": { "claims": { "min": 2, "max": 3 } }, "value": 1.35 },
+        { "match": { "claims": { "min": 3 } }, "value": 1.75 }
+      ]
+    },
+    "excess": {
+      "description": "Basic excess option in rand",
+      "dimensions": [{ "name": "option", "kind": "exact" }],
+      "rows": [
+        { "match": { "option": 3500 }, "value": 1.1 },
+        { "match": { "option": 5000 }, "value": 1.0 },
+        { "match": { "option": 7500 }, "value": 0.92 }
+      ]
+    }
+  },
+  "coverages": [
+    {
+      "code": "comprehensive",
+      "name": "Comprehensive cover",
+      "mandatory": true,
+      "steps": [
+        { "label": "Base annual rate", "op": "set", "operand": { "table": "baseRate", "keys": { "territory": "territory", "use": "vehicle.use" } } },
+        { "label": "Vehicle value", "op": "multiply", "operand": { "input": "vehicle.value" } },
+        { "label": "Monthly", "op": "divide", "operand": { "const": 12 } },
+        { "label": "Driver age factor", "op": "multiply", "operand": { "table": "driverAge", "keys": { "age": "driver.age" } } },
+        { "label": "Claims history factor", "op": "multiply", "operand": { "table": "claimsHistory", "keys": { "claims": "driver.claimsLast3Years" } } },
+        { "label": "Excess option factor", "op": "multiply", "operand": { "table": "excess", "keys": { "option": "excessOption" } } },
+        { "label": "Coverage minimum", "op": "atLeast", "operand": { "const": 200 } }
+      ]
+    },
+    {
+      "code": "car_hire",
+      "name": "Car hire (30 days)",
+      "steps": [{ "label": "Flat premium", "op": "set", "operand": { "const": 85 } }]
+    },
+    {
+      "code": "sasria",
+      "name": "SASRIA special risks",
+      "mandatory": true,
+      "steps": [{ "label": "Flat tariff (illustrative)", "op": "set", "operand": { "const": 12 } }]
+    }
+  ]
+}
