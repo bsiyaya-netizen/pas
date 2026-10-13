@@ -109,6 +109,7 @@ export function buildApp(deps: AppDeps): FastifyInstance {
     const { brokerId } = requireRole(request, "broker");
     return reply.code(201).send(await service.addClient(brokerId, NewClient.parse(request.body)));
   });
+  app.get("/clients", async (request) => service.listClients(requireRole(request, "broker").brokerId));
   app.post("/quotes", async (request, reply) => {
     const { brokerId } = requireRole(request, "broker");
     const { clientId, ...details } = NewQuote.parse(request.body);

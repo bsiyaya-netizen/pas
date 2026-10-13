@@ -65,7 +65,7 @@ and made-up rates, used for tests.
 | --- | --- | --- |
 | admin | `POST /brokers`, `POST /underwriters` | Onboard a broker (FSP number) or an insurer's underwriter |
 | anyone | `GET /products?line=motor` | Products on sale for a line |
-| broker | `POST /clients` | Add a client |
+| broker | `POST /clients`, `GET /clients` | Add a client; list own clients |
 | broker | `POST /quotes`, `GET /quotes`, `GET /quotes/:id` | Quote every insurer; list and view own quotes |
 | broker | `POST /quotes/:id/options/:productId/refer` | Send an option to the insurer's underwriters |
 | broker | `POST /quotes/:id/options/:productId/bind` | Bind and issue the policy |

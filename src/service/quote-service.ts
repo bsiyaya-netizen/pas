@@ -72,6 +72,14 @@ export class QuoteService {
     return client;
   }
 
+  async listClients(brokerId: string): Promise<Client[]> {
+    const { rows } = await this.db.query<Client>(
+      "select id, name from clients where broker_id = $1 order by name",
+      [brokerId],
+    );
+    return rows;
+  }
+
   async addUnderwriter(input: Omit<Underwriter, "id">): Promise<Underwriter> {
     const underwriter = { id: this.newId(), ...input };
     await this.db.query("insert into underwriters (id, name, insurer, authority) values ($1, $2, $3, $4)", [

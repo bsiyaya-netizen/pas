@@ -82,6 +82,7 @@ describe("broker journey", () => {
     const { bearer } = await onboardBroker();
     const client = await call("POST", "/clients", bearer, { name: "T. Mokoena" });
     expect(client.status).toBe(201);
+    expect((await call("GET", "/clients", bearer)).body).toEqual([client.body]);
 
     const quote = await call("POST", "/quotes", bearer, quoteBody(client.body.id));
     expect(quote.status).toBe(201);
@@ -101,6 +102,7 @@ describe("broker journey", () => {
     const a = await onboardBroker("11111");
     const b = await onboardBroker("22222");
     const client = (await call("POST", "/clients", a.bearer, { name: "Client" })).body;
+    expect((await call("GET", "/clients", b.bearer)).body).toEqual([]);
     expect((await call("POST", "/quotes", b.bearer, quoteBody(client.id))).status).toBe(404);
     const quote = (await call("POST", "/quotes", a.bearer, quoteBody(client.id))).body;
     expect((await call("GET", `/quotes/${quote.id}`, b.bearer)).status).toBe(404);
