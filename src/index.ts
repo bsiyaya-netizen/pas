@@ -22,3 +22,7 @@ export { versionOn } from "./policy/policy.js";
 export type { Policy, PolicyTerm, PolicyTransaction, PolicyVersion } from "./policy/policy.js";
 export { isValidFspNumber } from "./parties.js";
 export type { Broker, Client, Underwriter } from "./parties.js";
+export { fromPool } from "./db/database.js";
+export type { Database, Queryable } from "./db/database.js";
+export { migrate } from "./db/migrate.js";
+export { ConflictError, NotFoundError, QuoteService } from "./service/quote-service.js";
