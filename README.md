@@ -4,8 +4,8 @@ Policy Administration System for a South African short-term insurance broker:
 motor, home and commercial property, quoted across several insurers.
 
 Built so far: the **product model and rating engine**, **quote, referral
-and bind**, **PostgreSQL storage**, and the **HTTP API** the broker portal
-will use. Later slices add documents, endorsements, cancellations and
+and bind**, **PostgreSQL storage**, the **HTTP API**, and the **broker portal**
+(`web/`). Later slices add documents, endorsements, cancellations and
 renewals (see the design doc).
 
 ## How rating works
@@ -80,6 +80,21 @@ provider works). This server never stores passwords.
 
 Environment: `DATABASE_URL`, `AUTH_ISSUER`, `AUTH_AUDIENCE`, `AUTH_JWKS_URL`,
 optional `PORT` (3000) and `PRODUCTS_DIR` (`./products`). Migrations run on start.
+
+## Broker portal
+
+`web/` is a React app. Brokers add clients, capture a motor quote, compare
+insurers, refer and bind; underwriters see their insurer's referral queue and
+approve or decline with a note. Sign-in is Microsoft Entra: see
+[docs/entra-setup.md](docs/entra-setup.md).
+
+Try it locally without Entra:
+
+```sh
+npm ci && npm run build && npm run dev:api   # API + in-memory database, prints tokens
+cd web && npm ci
+VITE_DEV_TOKEN=<broker token> npm run dev    # http://localhost:5173
+```
 
 ## Commands
 
