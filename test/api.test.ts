@@ -117,6 +117,28 @@ describe("broker journey", () => {
     expect(again).toMatchObject({ status: 422, body: { error: expect.stringMatching(/already bound/) } });
   });
 
+  it("downloads the policy schedule and certificate as PDFs, only for the owning broker", async () => {
+    const { bearer } = await onboardBroker();
+    const client = (await call("POST", "/clients", bearer, { name: "T. Mokoena" })).body;
+    const quote = (await call("POST", "/quotes", bearer, quoteBody(client.id))).body;
+    const { policyNumber } = (await call("POST", `/quotes/${quote.id}/options/example-b-motor/bind`, bearer)).body;
+
+    for (const kind of ["schedule", "certificate"]) {
+      const res = await app.inject({
+        url: `/policies/${policyNumber}/documents/${kind}`,
+        headers: { authorization: `Bearer ${bearer}` },
+      });
+      expect(res.statusCode).toBe(200);
+      expect(res.headers["content-type"]).toBe("application/pdf");
+      expect(res.headers["content-disposition"]).toBe(`inline; filename="${policyNumber}-${kind}.pdf"`);
+      expect(res.rawPayload.subarray(0, 5).toString()).toBe("%PDF-");
+    }
+
+    expect((await call("GET", `/policies/${policyNumber}/documents/invoice`, bearer)).status).toBe(400);
+    const other = await onboardBroker("22222");
+    expect((await call("GET", `/policies/${policyNumber}/documents/schedule`, other.bearer)).status).toBe(404);
+  });
+
   it("hides one broker's records from another", async () => {
     const a = await onboardBroker("11111");
     const b = await onboardBroker("22222");

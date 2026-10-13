@@ -11,6 +11,15 @@ export function formatRand(cents: number): string {
   return `${sign}R${whole}.${String(abs % 100).padStart(2, "0")}`;
 }
 
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+/** "14 Oct 2026" from an ISO date, optionally shifted by whole days. */
+export function formatDate(iso: string, addDays = 0): string {
+  const d = new Date(`${iso}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + addDays);
+  return `${d.getUTCDate()} ${MONTHS[d.getUTCMonth()]} ${d.getUTCFullYear()}`;
+}
+
 export type OptionStatus =
   | "unpriceable"
   | "declined"

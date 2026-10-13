@@ -75,11 +75,22 @@ provider works). This server never stores passwords.
 | broker | `POST /quotes/:id/options/:productId/refer` | Send an option to the insurer's underwriters |
 | broker | `POST /quotes/:id/options/:productId/bind` | Bind and issue the policy |
 | broker | `GET /policies/:number` | View own policy |
+| broker | `GET /policies/:number/documents/schedule` | Policy schedule PDF |
+| broker | `GET /policies/:number/documents/certificate` | Certificate of insurance PDF |
 | underwriter | `GET /referrals` | Pending referrals for their insurer |
 | underwriter | `POST /quotes/:id/options/:productId/decision` | Approve or decline, with a note |
 
 Environment: `DATABASE_URL`, `AUTH_ISSUER`, `AUTH_AUDIENCE`, `AUTH_JWKS_URL`,
 optional `PORT` (3000) and `PRODUCTS_DIR` (`./products`). Migrations run on start.
+
+## Policy documents
+
+The policy schedule and certificate of insurance are A4 PDFs drawn on request
+from the policy record (`src/documents/`), so they always match the current
+version and nothing is stored. The schedule shows the parties with FSP numbers,
+the period, the insured risk, each section's premium with VAT, the broker's
+commission, and how to complain to the insurer or the ombuds. Each product file
+carries the insurer's registered name and FSP number in `insurerDetails`.
 
 ## Broker portal
 

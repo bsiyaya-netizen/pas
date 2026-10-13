@@ -73,6 +73,8 @@ export class ApiError extends Error {
 
 const base = import.meta.env.VITE_API_BASE ?? "/api";
 
+export type PolicyDocumentKind = "schedule" | "certificate";
+
 export function api(token: string) {
   async function call<T>(method: "GET" | "POST", path: string, body?: unknown): Promise<T> {
     const res = await fetch(`${base}${path}`, {
@@ -102,6 +104,17 @@ export function api(token: string) {
     refer: (quoteId: string, productId: string) => call<Quote>("POST", option(quoteId, productId, "refer")),
     bind: (quoteId: string, productId: string) => call<Policy>("POST", option(quoteId, productId, "bind")),
     policy: (n: string) => call<Policy>("GET", `/policies/${encodeURIComponent(n)}`),
+    /** A policy document as a PDF; fetched with the token, since a plain link would not carry it. */
+    policyDocument: async (n: string, kind: PolicyDocumentKind): Promise<Blob> => {
+      const res = await fetch(`${base}/policies/${encodeURIComponent(n)}/documents/${kind}`, {
+        headers: { authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new ApiError(res.status, data.error ?? `Request failed (${res.status})`);
+      }
+      return res.blob();
+    },
     referrals: () => call<Quote[]>("GET", "/referrals"),
     decide: (quoteId: string, productId: string, decision: "approved" | "declined", note: string) =>
       call<Quote>("POST", option(quoteId, productId, "decision"), { decision, note }),

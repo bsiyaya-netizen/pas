@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { QuoteOption } from "../src/api";
-import { formatRand, optionStatus } from "../src/format";
+import { formatDate, formatRand, optionStatus } from "../src/format";
 
 const priced: QuoteOption = {
   productId: "p",
@@ -15,6 +15,13 @@ describe("formatRand", () => {
     expect(formatRand(1_234_567_801)).toBe("R12\u00a0345\u00a0678.01");
     expect(formatRand(5)).toBe("R0.05");
     expect(formatRand(-8_500)).toBe("-R85.00");
+  });
+});
+
+describe("formatDate", () => {
+  it("writes ISO dates as day, month and year", () => {
+    expect(formatDate("2026-11-01")).toBe("1 Nov 2026");
+    expect(formatDate("2027-11-01", -1)).toBe("31 Oct 2027");
   });
 });
 

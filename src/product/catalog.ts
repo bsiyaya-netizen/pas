@@ -26,6 +26,11 @@ export class ProductCatalog {
     return latestInForce(this.products.filter((p) => p.id === productId), onDate);
   }
 
+  /** An exact product version, e.g. the one a policy was rated on. */
+  get(productId: string, version: number): Product | undefined {
+    return this.products.find((p) => p.id === productId && p.version === version);
+  }
+
   /** One product per insurer for a line, each the version in force on the date. */
   forLine(line: Line, onDate: string): Product[] {
     const ids = new Set(this.products.filter((p) => p.line === line).map((p) => p.id));

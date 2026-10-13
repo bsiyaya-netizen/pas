@@ -4,6 +4,7 @@ import type { ProductCatalog } from "../product/catalog.js";
 import { LINES } from "../product/schema.js";
 import { QuoteError } from "../quote/quote.js";
 import { RatingError } from "../rating/engine.js";
+import { renderCertificate, renderSchedule } from "../documents/render.js";
 import { ConflictError, NotFoundError, type QuoteService } from "../service/quote-service.js";
 import { AuthError, type Actor, type Authenticator } from "./auth.js";
 
@@ -144,6 +145,19 @@ export function buildApp(deps: AppDeps): FastifyInstance {
   app.get("/policies/:policyNumber", async (request) => {
     const { policyNumber } = z.object({ policyNumber: z.string() }).parse(request.params);
     return service.getPolicy(requireRole(request, "broker").brokerId, policyNumber);
+  });
+
+  app.get("/policies/:policyNumber/documents/:kind", async (request, reply) => {
+    const { policyNumber, kind } = z
+      .object({ policyNumber: z.string(), kind: z.enum(["schedule", "certificate"]) })
+      .parse(request.params);
+    const doc = await service.getPolicyDocument(requireRole(request, "broker").brokerId, policyNumber);
+    const pdf = kind === "schedule" ? await renderSchedule(doc) : await renderCertificate(doc);
+    return reply
+      .type("application/pdf")
+      .header("content-disposition", `inline; filename="${policyNumber}-${kind}.pdf"`)
+      .header("cache-control", "no-store")
+      .send(Buffer.from(pdf));
   });
 
   // Underwriter: the referral queue and decisions.

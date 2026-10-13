@@ -1,6 +1,8 @@
 import { randomUUID } from "node:crypto";
 import type { Database, Queryable } from "../db/database.js";
 import { isValidFspNumber, type Broker, type Client, type Underwriter } from "../parties.js";
+import { isoDate } from "../dates.js";
+import { policyDocument, type PolicyDocument } from "../documents/policy-document.js";
 import type { Policy } from "../policy/policy.js";
 import type { ProductCatalog } from "../product/catalog.js";
 import {
@@ -237,6 +239,18 @@ export class QuoteService {
     );
     if (!rows[0]) throw new NotFoundError(`Policy ${policyNumber}`);
     return rows[0].document;
+  }
+
+  /** What the policy's schedule and certificate print, as of today. */
+  async getPolicyDocument(brokerId: string, policyNumber: string): Promise<PolicyDocument> {
+    const policy = await this.getPolicy(brokerId, policyNumber);
+    const broker = await this.broker(brokerId);
+    const { rows } = await this.db.query<Client>("select id, name from clients where id = $1", [policy.clientId]);
+    if (!rows[0]) throw new NotFoundError(`Client ${policy.clientId}`);
+    const rating = policy.terms.at(-1)?.versions.at(-1)?.rating;
+    const product = rating && this.catalog.get(rating.productId, rating.productVersion);
+    if (!product) throw new Error(`Product ${policy.productId} for policy ${policyNumber} is not loaded`);
+    return policyDocument(policy, { broker, client: rows[0], product, issuedOn: isoDate(this.deps.now()) });
   }
 
   private async underwriter(underwriterId: string): Promise<Underwriter> {
