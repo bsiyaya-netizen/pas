@@ -15,6 +15,8 @@ import {
   type EndorsementRequest,
 } from "../policy/changes.js";
 import type { Policy, PolicyTransaction } from "../policy/policy.js";
+import { brokerDashboard, type Dashboard } from "../reporting/dashboard.js";
+import { policyRegister, transactionReport, type Report } from "../reporting/reports.js";
 import type { ProductCatalog } from "../product/catalog.js";
 import {
   bindQuote,
@@ -321,6 +323,33 @@ export class QuoteService {
         t.processedBy,
       ],
     );
+  }
+
+  async listPolicies(brokerId: string): Promise<Policy[]> {
+    const { rows } = await this.db.query<{ document: Policy }>(
+      "select document from policies where broker_id = $1 order by policy_number",
+      [brokerId],
+    );
+    return rows.map((r) => r.document);
+  }
+
+  async dashboard(brokerId: string): Promise<Dashboard> {
+    const [policies, quotes, clients] = await Promise.all([
+      this.listPolicies(brokerId),
+      this.listQuotes(brokerId),
+      this.listClients(brokerId),
+    ]);
+    return brokerDashboard(policies, quotes, clients, isoDate(this.deps.now()));
+  }
+
+  async policyRegister(brokerId: string, asOf?: string): Promise<Report> {
+    const [policies, clients] = await Promise.all([this.listPolicies(brokerId), this.listClients(brokerId)]);
+    return policyRegister(policies, clients, asOf ?? isoDate(this.deps.now()));
+  }
+
+  async transactionReport(brokerId: string, from: string, to: string): Promise<Report> {
+    const [policies, clients] = await Promise.all([this.listPolicies(brokerId), this.listClients(brokerId)]);
+    return transactionReport(policies, clients, from, to);
   }
 
   /** What the policy's schedule and certificate print, as of today. */

@@ -78,6 +78,9 @@ provider works). This server never stores passwords.
 | broker | `GET /policies/:number` | View own policy |
 | broker | `POST /policies/:number/endorsements/preview`, `POST /policies/:number/endorsements` | Price, then apply, a mid-term change |
 | broker | `POST /policies/:number/cancellation/preview`, `POST /policies/:number/cancellation` | Work out the refund, then cancel |
+| broker | `GET /dashboard` | Book summary: in force, premium, commission, quotes, renewals, monthly activity |
+| broker | `GET /reports/policies?asOf=` | Policy register CSV |
+| broker | `GET /reports/transactions?from=&to=` | Transactions CSV |
 | broker | `GET /policies/:number/documents/schedule` | Policy schedule PDF |
 | broker | `GET /policies/:number/documents/certificate` | Certificate of insurance PDF |
 | underwriter | `GET /referrals` | Pending referrals for their insurer |
@@ -99,6 +102,17 @@ Premiums are monthly, paid in advance on the monthly anniversary of the
 start date. A change or cancellation part-way through a month carries a
 once-off pro-rata amount for the rest of that month: the premium difference
 for a change, or the unused premium returned for a cancellation.
+
+## Dashboard and reports
+
+The portal opens on a dashboard of the broker's book: policies, monthly
+premium and commission in force today, quote conversion over 30 days, items
+needing attention (quotes about to expire, referrals, renewals due within 60
+days), new business premium for the last 12 months, the split by insurer and
+recent activity. Two CSV reports download from the same page: a policy
+register as at a date and the transactions processed between two dates. The
+figures come from pure functions in `src/reporting/`, so the dashboard and the
+reports always agree.
 
 ## Policy documents
 

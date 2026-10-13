@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import { api } from "./api";
 import { currentUser, roleOf, userManager } from "./auth";
 import { Clients } from "./pages/Clients";
+import { Dashboard } from "./pages/Dashboard";
 import { NewQuote } from "./pages/NewQuote";
 import { PolicyCancel } from "./pages/PolicyCancel";
 import { PolicyChange } from "./pages/PolicyChange";
@@ -51,7 +52,8 @@ function SignedIn({ user }: { user: User }) {
     else if (section === "policies" && id && action === "change") page = <PolicyChange api={client} policyNumber={id} />;
     else if (section === "policies" && id && action === "cancel") page = <PolicyCancel api={client} policyNumber={id} />;
     else if (section === "policies" && id) page = <PolicyView api={client} policyNumber={id} />;
-    else page = <QuoteList api={client} />;
+    else if (section === "quotes") page = <QuoteList api={client} />;
+    else page = <Dashboard api={client} />;
   } else if (role === "underwriter") {
     page = <Referrals api={client} />;
   } else {
@@ -65,6 +67,7 @@ function SignedIn({ user }: { user: User }) {
         <nav>
           {role === "broker" && (
             <>
+              <a href={href("dashboard")}>Dashboard</a>
               <a href={href("quotes")}>Quotes</a>
               <a href={href("quotes", "new")}>New quote</a>
               <a href={href("clients")}>Clients</a>

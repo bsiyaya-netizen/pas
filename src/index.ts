@@ -55,3 +55,7 @@ export { buildApp } from "./api/app.js";
 export type { AppDeps } from "./api/app.js";
 export { AuthError, jwtAuthenticator, oidcAuthenticator } from "./api/auth.js";
 export type { Actor, Authenticator } from "./api/auth.js";
+export { brokerDashboard, monthlyActivity } from "./reporting/dashboard.js";
+export type { Dashboard, InsurerSummary, MonthActivity } from "./reporting/dashboard.js";
+export { policyRegister, toCsv, transactionReport } from "./reporting/reports.js";
+export type { Report } from "./reporting/reports.js";

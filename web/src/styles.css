@@ -68,3 +68,32 @@ a.button { display: inline-block; }
 a.button.secondary { background: transparent; color: var(--accent); border: 1px solid var(--accent); }
 button.danger { background: var(--bad); }
 .actions { margin: 1rem 0; }
+.tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 0.75rem; margin: 1rem 0; }
+.tile { background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 0.9rem 1rem; display: grid; gap: 0.2rem; }
+.tile-label { color: var(--muted); font-size: 0.85rem; }
+.tile-value { font-size: 1.6rem; font-variant-numeric: tabular-nums; }
+.tile-note { font-size: 0.8rem; }
+.panel { background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 1rem; margin-bottom: 1rem; min-width: 0; }
+.panel h2 { margin-top: 0; font-size: 1.05rem; }
+.columns { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 1rem; }
+.attention, .activity { margin: 0; padding-left: 1.1rem; display: grid; gap: 0.35rem; }
+.chart { position: relative; }
+.chart svg { width: 100%; height: auto; display: block; }
+.chart .grid { stroke: var(--line); stroke-width: 1; }
+.chart .baseline { stroke: var(--muted); stroke-width: 1; }
+.chart .tick { fill: var(--muted); font-size: 11px; font-variant-numeric: tabular-nums; }
+.chart .value { fill: var(--ink); font-size: 12px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.chart .bar { fill: var(--accent); }
+.chart .bar.active { fill: #174a96; }
+.chart .hit { fill: transparent; cursor: default; outline: none; }
+.chart .hit:focus-visible { stroke: var(--accent); stroke-width: 2; }
+.chart .tooltip { position: absolute; top: 0; transform: translateX(-50%); background: var(--ink); color: #fff; padding: 0.4rem 0.6rem; border-radius: 6px; font-size: 0.8rem; display: grid; pointer-events: none; white-space: nowrap; }
+.share { display: block; height: 4px; background: var(--bg); border-radius: 2px; margin-top: 4px; max-width: 160px; }
+.share span { display: block; height: 100%; background: var(--accent); border-radius: 2px; }
+.report-row { display: grid; grid-template-columns: 1fr auto auto; gap: 1rem; align-items: end; padding: 0.75rem 0; border-top: 1px solid var(--line); }
+.report-row > div:first-child { display: grid; gap: 0.2rem; }
+@media (max-width: 640px) { .report-row { grid-template-columns: 1fr; } }
+details summary { cursor: pointer; color: var(--accent); margin-top: 0.5rem; }
+.panel td.num, .panel th.num { padding-left: 1rem; white-space: nowrap; }
+.table-scroll { overflow-x: auto; }
+@media (max-width: 640px) { .chart { overflow-x: auto; } .chart svg { min-width: 520px; } }
