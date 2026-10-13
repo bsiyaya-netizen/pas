@@ -3,8 +3,8 @@
 Policy Administration System for a South African short-term insurance broker:
 motor, home and commercial property, quoted across several insurers.
 
-Built so far: the **product model and rating engine**, and **quote, referral
-and bind**. Later slices add documents, endorsements, cancellations and
+Built so far: the **product model and rating engine**, **quote, referral
+and bind**, and **PostgreSQL storage**. Later slices add documents, endorsements, cancellations and
 renewals (see the design doc).
 
 ## How rating works
@@ -32,7 +32,23 @@ renewals (see the design doc).
 3. `bindQuote` lets the broker who owns the quote bind a bindable option. It
    issues a policy with term 1, version 1 and a new-business transaction.
 
-These are pure functions over plain objects; storage comes in a later slice.
+These are pure functions over plain objects.
+
+## Storage
+
+PostgreSQL. `db/migrations/*.sql` holds the schema; `migrate(db)` applies any
+not yet recorded in `schema_migrations`. `QuoteService` wraps the quote steps
+above with storage:
+
+- Every broker call is scoped to that broker's own clients, quotes and policies.
+- Binding runs in one transaction: the quote is locked, a policy number is
+  taken from a sequence (`POL-0000001`), and the policy and its new-business
+  transaction are written together. A database rule allows one policy per quote.
+- Each quote carries a revision number, so two people changing the same quote
+  at once cannot overwrite each other.
+
+In production, pass `fromPool(new pg.Pool(...))` as the database. Tests use
+PGlite, an in-memory Postgres, so they need no database server.
 
 The two products in `products/` are **illustrative only**: fictional insurers
 and made-up rates, used for tests.
