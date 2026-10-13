@@ -198,6 +198,38 @@ describe("broker journey", () => {
     expect((await call("POST", `/policies/${policyNumber}/cancellation`, bearer, { effectiveDate: "2026-11-21", reason: "fraud" })).status).toBe(400);
   });
 
+  it("serves the dashboard and CSV reports for the broker's own book", async () => {
+    const { bearer } = await onboardBroker();
+    const client = (await call("POST", "/clients", bearer, { name: "T. Mokoena" })).body;
+    const quote = (await call("POST", "/quotes", bearer, quoteBody(client.id))).body;
+    const { policyNumber } = (await call("POST", `/quotes/${quote.id}/options/example-b-motor/bind`, bearer)).body;
+
+    const dashboard = await call("GET", "/dashboard", bearer);
+    expect(dashboard.body).toMatchObject({
+      asOf: "2026-10-13",
+      inForce: { policies: 0 },
+      startingSoon: 1,
+      quotes: { last30Days: 1, boundLast30Days: 1, conversionRate: 1 },
+    });
+    expect(dashboard.body.months.at(-1)).toMatchObject({ month: "2026-10", newPolicies: 1, newPremium: 93_450 });
+
+    const register = await app.inject({ url: "/reports/policies?asOf=2026-11-15", headers: { authorization: `Bearer ${bearer}` } });
+    expect(register.headers["content-type"]).toBe("text/csv; charset=utf-8");
+    expect(register.headers["content-disposition"]).toBe('attachment; filename="policy-register-2026-11-15.csv"');
+    expect(register.body).toContain(`${policyNumber},T. Mokoena,,Example Insurer B,Motor,In force,2026-11-01,2027-10-31,934.50`);
+
+    const transactions = await app.inject({
+      url: "/reports/transactions?from=2026-10-01&to=2026-10-31",
+      headers: { authorization: `Bearer ${bearer}` },
+    });
+    expect(transactions.body.trim().split("\r\n")).toHaveLength(2);
+    expect((await call("GET", "/reports/transactions?from=2026-11-01&to=2026-10-01", bearer)).status).toBe(400);
+
+    const other = await onboardBroker("22222");
+    expect((await call("GET", "/dashboard", other.bearer)).body.quotes.last30Days).toBe(0);
+    expect((await call("GET", "/dashboard", admin)).status).toBe(403);
+  });
+
   it("hides one broker's records from another", async () => {
     const a = await onboardBroker("11111");
     const b = await onboardBroker("22222");

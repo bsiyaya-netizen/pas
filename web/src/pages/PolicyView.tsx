@@ -1,5 +1,6 @@
 import { useState } from "react";
 import type { Api, PolicyDocumentKind } from "../api";
+import { saveFile } from "../download";
 import { formatDate, formatRand } from "../format";
 import { href } from "../router";
 import { useLoad } from "../useLoad";
@@ -17,10 +18,7 @@ export function PolicyView({ api, policyNumber }: { api: Api; policyNumber: stri
     setBusy(kind);
     setError(undefined);
     try {
-      const url = URL.createObjectURL(await api.policyDocument(policyNumber, kind));
-      const link = Object.assign(document.createElement("a"), { href: url, download: `${policyNumber}-${kind}.pdf` });
-      link.click();
-      setTimeout(() => URL.revokeObjectURL(url), 10_000);
+      saveFile(await api.policyDocument(policyNumber, kind), `${policyNumber}-${kind}.pdf`);
     } catch (e) {
       setError((e as Error).message);
     } finally {

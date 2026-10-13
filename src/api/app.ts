@@ -1,4 +1,4 @@
-import Fastify, { type FastifyInstance, type FastifyRequest } from "fastify";
+import Fastify, { type FastifyInstance, type FastifyReply, type FastifyRequest } from "fastify";
 import { z, ZodError } from "zod";
 import type { ProductCatalog } from "../product/catalog.js";
 import { LINES } from "../product/schema.js";
@@ -6,7 +6,9 @@ import { PolicyChangeError } from "../policy/changes.js";
 import { CANCELLATION_REASONS } from "../policy/policy.js";
 import { QuoteError } from "../quote/quote.js";
 import { RatingError } from "../rating/engine.js";
+import { isoDate } from "../dates.js";
 import { renderCertificate, renderSchedule } from "../documents/render.js";
+import { toCsv, type Report } from "../reporting/reports.js";
 import { ConflictError, NotFoundError, type QuoteService } from "../service/quote-service.js";
 import { AuthError, type Actor, type Authenticator } from "./auth.js";
 
@@ -218,6 +220,28 @@ export function buildApp(deps: AppDeps): FastifyInstance {
       .header("content-disposition", `inline; filename="${policyNumber}-${kind}.pdf"`)
       .header("cache-control", "no-store")
       .send(Buffer.from(pdf));
+  });
+
+  // Broker: dashboard and spreadsheet reports.
+  app.get("/dashboard", async (request) => service.dashboard(requireRole(request, "broker").brokerId));
+  const csv = (reply: FastifyReply, name: string, report: Report) =>
+    reply
+      .type("text/csv; charset=utf-8")
+      .header("content-disposition", `attachment; filename="${name}.csv"`)
+      .header("cache-control", "no-store")
+      .send(toCsv(report));
+  app.get("/reports/policies", async (request, reply) => {
+    const { asOf } = z.object({ asOf: IsoDate.optional() }).parse(request.query);
+    const report = await service.policyRegister(requireRole(request, "broker").brokerId, asOf);
+    return csv(reply, `policy-register-${asOf ?? isoDate(now())}`, report);
+  });
+  app.get("/reports/transactions", async (request, reply) => {
+    const { from, to } = z
+      .object({ from: IsoDate, to: IsoDate })
+      .refine((r) => r.from <= r.to, { message: "from must be on or before to", path: ["to"] })
+      .parse(request.query);
+    const report = await service.transactionReport(requireRole(request, "broker").brokerId, from, to);
+    return csv(reply, `transactions-${from}-to-${to}`, report);
   });
 
   // Underwriter: the referral queue and decisions.

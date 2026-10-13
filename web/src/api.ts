@@ -131,6 +131,30 @@ export class ApiError extends Error {
 
 const base = import.meta.env.VITE_API_BASE ?? "/api";
 
+export interface Dashboard {
+  asOf: string;
+  inForce: { policies: number; premium: number; commission: number };
+  startingSoon: number;
+  byInsurer: { insurer: string; policies: number; premium: number; commission: number }[];
+  quotes: {
+    last30Days: number;
+    boundLast30Days: number;
+    conversionRate: number | null;
+    expiringSoon: { id: string; clientName: string; expiresOn: string }[];
+    awaitingUnderwriter: number;
+  };
+  renewalsDue: { policyNumber: string; clientName: string; insurer: string; endsOn: string; premium: number }[];
+  months: {
+    month: string;
+    newPolicies: number;
+    newPremium: number;
+    endorsements: number;
+    cancellations: number;
+    premiumChange: number;
+  }[];
+  recent: (PolicyTransaction & { policyNumber: string; clientName: string })[];
+}
+
 export type PolicyDocumentKind = "schedule" | "certificate";
 
 export function api(token: string) {
@@ -146,6 +170,16 @@ export function api(token: string) {
     const data = await res.json().catch(() => ({}));
     if (!res.ok) throw new ApiError(res.status, data.error ?? `Request failed (${res.status})`);
     return data as T;
+  }
+
+  /** Files are fetched with the token, since a plain link would not carry it. */
+  async function file(path: string): Promise<Blob> {
+    const res = await fetch(`${base}${path}`, { headers: { authorization: `Bearer ${token}` } });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      throw new ApiError(res.status, data.error ?? `Request failed (${res.status})`);
+    }
+    return res.blob();
   }
 
   const option = (quoteId: string, productId: string, action: string) =>
@@ -164,17 +198,12 @@ export function api(token: string) {
     refer: (quoteId: string, productId: string) => call<Quote>("POST", option(quoteId, productId, "refer")),
     bind: (quoteId: string, productId: string) => call<Policy>("POST", option(quoteId, productId, "bind")),
     policy: (n: string) => call<Policy>("GET", `/policies/${encodeURIComponent(n)}`),
-    /** A policy document as a PDF; fetched with the token, since a plain link would not carry it. */
-    policyDocument: async (n: string, kind: PolicyDocumentKind): Promise<Blob> => {
-      const res = await fetch(`${base}/policies/${encodeURIComponent(n)}/documents/${kind}`, {
-        headers: { authorization: `Bearer ${token}` },
-      });
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new ApiError(res.status, data.error ?? `Request failed (${res.status})`);
-      }
-      return res.blob();
-    },
+    /** A policy document as a PDF. */
+    policyDocument: (n: string, kind: PolicyDocumentKind) =>
+      file(`/policies/${encodeURIComponent(n)}/documents/${kind}`),
+    dashboard: () => call<Dashboard>("GET", "/dashboard"),
+    policyRegister: (asOf: string) => file(`/reports/policies?asOf=${asOf}`),
+    transactionReport: (from: string, to: string) => file(`/reports/transactions?from=${from}&to=${to}`),
     previewChange: (n: string, change: ChangeRequest) =>
       call<EndorsementPreview>("POST", `/policies/${encodeURIComponent(n)}/endorsements/preview`, change),
     change: (n: string, change: ChangeRequest) =>
