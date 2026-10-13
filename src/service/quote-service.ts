@@ -3,7 +3,18 @@ import type { Database, Queryable } from "../db/database.js";
 import { isValidFspNumber, isValidSaIdNumber, type Broker, type Client, type Underwriter } from "../parties.js";
 import { isoDate } from "../dates.js";
 import { policyDocument, type PolicyDocument } from "../documents/policy-document.js";
-import type { Policy } from "../policy/policy.js";
+import {
+  cancel,
+  endorse,
+  previewCancellation,
+  previewEndorsement,
+  ratedProduct,
+  type CancellationPreview,
+  type CancellationRequest,
+  type EndorsementPreview,
+  type EndorsementRequest,
+} from "../policy/changes.js";
+import type { Policy, PolicyTransaction } from "../policy/policy.js";
 import type { ProductCatalog } from "../product/catalog.js";
 import {
   bindQuote,
@@ -232,13 +243,7 @@ export class QuoteService {
           policy,
         ],
       );
-      for (const t of policy.transactions) {
-        await tx.query(
-          `insert into policy_transactions (id, policy_number, type, effective_date, processed_at, premium_delta, processed_by)
-           values ($1, $2, $3, $4, $5, $6, $7)`,
-          [t.id, policy.policyNumber, t.type, t.effectiveDate, t.processedAt, t.premiumDelta, t.processedBy],
-        );
-      }
+      for (const t of policy.transactions) await this.insertTransaction(tx, policy.policyNumber, t);
       return policy;
     });
   }
@@ -250,6 +255,72 @@ export class QuoteService {
     );
     if (!rows[0]) throw new NotFoundError(`Policy ${policyNumber}`);
     return rows[0].document;
+  }
+
+  async previewEndorsement(brokerId: string, policyNumber: string, request: EndorsementRequest): Promise<EndorsementPreview> {
+    const policy = await this.getPolicy(brokerId, policyNumber);
+    return previewEndorsement(policy, ratedProduct(this.catalog, policy), request, this.deps);
+  }
+
+  /** Applies a mid-term change as a new policy version, in one transaction. */
+  async endorse(brokerId: string, policyNumber: string, request: EndorsementRequest): Promise<Policy> {
+    const broker = await this.broker(brokerId);
+    return this.changePolicy(brokerId, policyNumber, (policy, transactionId) =>
+      endorse(policy, ratedProduct(this.catalog, policy), request, broker, { ...this.deps, transactionId }).policy,
+    );
+  }
+
+  async previewCancellation(brokerId: string, policyNumber: string, effectiveDate: string): Promise<CancellationPreview> {
+    return previewCancellation(await this.getPolicy(brokerId, policyNumber), { effectiveDate }, this.deps);
+  }
+
+  async cancel(brokerId: string, policyNumber: string, request: CancellationRequest): Promise<Policy> {
+    const broker = await this.broker(brokerId);
+    return this.changePolicy(brokerId, policyNumber, (policy, transactionId) =>
+      cancel(policy, request, broker, { ...this.deps, transactionId }).policy,
+    );
+  }
+
+  /** Locks the policy, applies a change that adds one transaction, and saves both. */
+  private async changePolicy(
+    brokerId: string,
+    policyNumber: string,
+    change: (policy: Policy, transactionId: string) => Policy,
+  ): Promise<Policy> {
+    return this.db.transaction(async (tx) => {
+      const { rows } = await tx.query<{ document: Policy; revision: number }>(
+        "select document, revision from policies where policy_number = $1 and broker_id = $2 for update",
+        [policyNumber, brokerId],
+      );
+      if (!rows[0]) throw new NotFoundError(`Policy ${policyNumber}`);
+      const policy = change(rows[0].document, this.newId());
+      const saved = await tx.query(
+        "update policies set document = $1, status = $2, revision = revision + 1 where policy_number = $3 and revision = $4 returning policy_number",
+        [policy, policy.status, policyNumber, rows[0].revision],
+      );
+      if (saved.rows.length === 0) throw new ConflictError(`Policy ${policyNumber}`);
+      await this.insertTransaction(tx, policyNumber, policy.transactions.at(-1)!);
+      return policy;
+    });
+  }
+
+  private async insertTransaction(q: Queryable, policyNumber: string, t: PolicyTransaction): Promise<void> {
+    await q.query(
+      `insert into policy_transactions
+         (id, policy_number, type, effective_date, processed_at, premium_delta, pro_rata_adjustment, description, processed_by)
+       values ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+      [
+        t.id,
+        policyNumber,
+        t.type,
+        t.effectiveDate,
+        t.processedAt,
+        t.premiumDelta,
+        t.proRataAdjustment ?? 0,
+        t.description ?? null,
+        t.processedBy,
+      ],
+    );
   }
 
   /** What the policy's schedule and certificate print, as of today. */

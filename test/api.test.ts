@@ -165,6 +165,39 @@ describe("broker journey", () => {
     expect((await call("PUT", `/clients/${created.body.id}`, other.bearer, { name: "Taken" })).status).toBe(404);
   });
 
+  it("changes a policy mid-term and then cancels it", async () => {
+    const { bearer } = await onboardBroker();
+    const client = (await call("POST", "/clients", bearer, { name: "T. Mokoena" })).body;
+    const quote = (await call("POST", "/quotes", bearer, quoteBody(client.id))).body;
+    const { policyNumber } = (await call("POST", `/quotes/${quote.id}/options/example-a-motor/bind`, bearer)).body;
+    const change = { effectiveDate: "2026-11-16", risk: cleanRisk, coverages: ["car_hire"] };
+
+    const preview = await call("POST", `/policies/${policyNumber}/endorsements/preview`, bearer, change);
+    expect(preview.body).toMatchObject({ premiumBefore: 102_450, premiumAfter: 110_950, proRataAdjustment: 4_250 });
+    const endorsed = await call("POST", `/policies/${policyNumber}/endorsements`, bearer, change);
+    expect(endorsed.status).toBe(201);
+    expect(endorsed.body.terms[0].versions).toHaveLength(2);
+    const backdated = await call("POST", `/policies/${policyNumber}/endorsements`, bearer, { ...change, effectiveDate: "2026-10-01" });
+    expect(backdated).toMatchObject({ status: 422, body: { error: expect.stringMatching(/backdated/) } });
+
+    const refund = await call("POST", `/policies/${policyNumber}/cancellation/preview`, bearer, { effectiveDate: "2026-11-21" });
+    expect(refund.body).toEqual({ effectiveDate: "2026-11-21", lastDayOfCover: "2026-11-20", refund: 36_983 });
+    const other = await onboardBroker("22222");
+    expect((await call("POST", `/policies/${policyNumber}/cancellation`, other.bearer, { effectiveDate: "2026-11-21", reason: "other" })).status).toBe(404);
+    const cancelled = await call("POST", `/policies/${policyNumber}/cancellation`, bearer, {
+      effectiveDate: "2026-11-21",
+      reason: "client_request",
+    });
+    expect(cancelled).toMatchObject({ status: 201, body: { status: "cancelled", cancellation: { effectiveDate: "2026-11-21" } } });
+    expect((await call("GET", `/policies/${policyNumber}`, bearer)).body.transactions.map((t: { type: string }) => t.type)).toEqual([
+      "new_business",
+      "endorsement",
+      "cancellation",
+    ]);
+    expect((await call("POST", `/policies/${policyNumber}/endorsements`, bearer, change)).status).toBe(422);
+    expect((await call("POST", `/policies/${policyNumber}/cancellation`, bearer, { effectiveDate: "2026-11-21", reason: "fraud" })).status).toBe(400);
+  });
+
   it("hides one broker's records from another", async () => {
     const a = await onboardBroker("11111");
     const b = await onboardBroker("22222");

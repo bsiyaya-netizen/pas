@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { formatDate, formatRand, policyDocument } from "../src/documents/policy-document.js";
 import { renderCertificate, renderSchedule } from "../src/documents/render.js";
 import type { Broker } from "../src/parties.js";
+import { cancel } from "../src/policy/changes.js";
 import { bindQuote, createQuote } from "../src/quote/quote.js";
 import { catalog, cleanRisk, productB } from "./fixtures.js";
 
@@ -97,6 +98,18 @@ describe("client and vehicle details", () => {
   it("leaves out details that were never captured", () => {
     expect(doc().insured).toEqual({ name: "T. Mokoena" });
     expect(doc().risk[0]!.rows[0]![0]).toBe("Sum insured");
+  });
+});
+
+describe("cancelled policies", () => {
+  it("end cover the day before the cancellation date", () => {
+    const { policy } = cancel(issuedPolicy(), { effectiveDate: "2026-12-15", reason: "client_request" }, broker, {
+      ...today,
+      transactionId: "t-2",
+    });
+    const d = policyDocument(policy, { broker, client, product: productB, issuedOn: "2026-10-13" });
+    expect(d.term).toEqual({ number: 1, from: "2026-11-01", to: "2026-12-14" });
+    expect(d.cancelledFrom).toBe("2026-12-15");
   });
 });
 

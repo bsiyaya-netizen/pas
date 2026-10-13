@@ -162,6 +162,7 @@ export async function renderSchedule(doc: PolicyDocument): Promise<Uint8Array> {
 
   layout.heading("Policy");
   layout.field("Policy number", doc.policyNumber);
+  if (doc.cancelledFrom) layout.field("Status", `Cancelled. Cover ends on ${formatDate(doc.term.to)}`);
   layout.field("Policyholder", doc.insured.name);
   if (doc.insured.idNumber) layout.field("ID number", doc.insured.idNumber);
   if (doc.insured.address) layout.field("Address", doc.insured.address);

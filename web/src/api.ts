@@ -60,13 +60,57 @@ export interface Quote {
   options: QuoteOption[];
 }
 
+export interface PolicyVersion {
+  number: number;
+  effectiveFrom: string;
+  risk: Record<string, unknown>;
+  coverages: string[];
+  rating: NonNullable<QuoteOption["rating"]>;
+}
+
+export interface PolicyTransaction {
+  id: string;
+  type: "new_business" | "endorsement" | "cancellation";
+  effectiveDate: string;
+  processedAt: string;
+  premiumDelta: number;
+  proRataAdjustment?: number;
+  description?: string;
+}
+
+export type CancellationReason = "client_request" | "vehicle_sold" | "replaced_elsewhere" | "other";
+
 export interface Policy {
   policyNumber: string;
   quoteId: string;
+  productId: string;
   insurer: string;
   line: string;
-  status: string;
-  terms: { number: number; start: string; end: string; versions: { number: number; rating: QuoteOption["rating"] }[] }[];
+  status: "in_force" | "cancelled";
+  terms: { number: number; start: string; end: string; versions: PolicyVersion[] }[];
+  transactions: PolicyTransaction[];
+  cancellation?: { effectiveDate: string; reason: CancellationReason; note?: string };
+}
+
+export interface ChangeRequest {
+  effectiveDate: string;
+  risk: Record<string, unknown>;
+  coverages: string[];
+  description?: string;
+}
+
+export interface EndorsementPreview {
+  effectiveDate: string;
+  premiumBefore: number;
+  premiumAfter: number;
+  proRataAdjustment: number;
+  warnings: RuleHit[];
+}
+
+export interface CancellationPreview {
+  effectiveDate: string;
+  lastDayOfCover: string;
+  refund: number;
 }
 
 export interface Product {
@@ -131,6 +175,14 @@ export function api(token: string) {
       }
       return res.blob();
     },
+    previewChange: (n: string, change: ChangeRequest) =>
+      call<EndorsementPreview>("POST", `/policies/${encodeURIComponent(n)}/endorsements/preview`, change),
+    change: (n: string, change: ChangeRequest) =>
+      call<Policy>("POST", `/policies/${encodeURIComponent(n)}/endorsements`, change),
+    previewCancellation: (n: string, effectiveDate: string) =>
+      call<CancellationPreview>("POST", `/policies/${encodeURIComponent(n)}/cancellation/preview`, { effectiveDate }),
+    cancel: (n: string, body: { effectiveDate: string; reason: CancellationReason; note?: string }) =>
+      call<Policy>("POST", `/policies/${encodeURIComponent(n)}/cancellation`, body),
     referrals: () => call<Quote[]>("GET", "/referrals"),
     decide: (quoteId: string, productId: string, decision: "approved" | "declined", note: string) =>
       call<Quote>("POST", option(quoteId, productId, "decision"), { decision, note }),

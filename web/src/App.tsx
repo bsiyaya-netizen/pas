@@ -4,6 +4,8 @@ import { api } from "./api";
 import { currentUser, roleOf, userManager } from "./auth";
 import { Clients } from "./pages/Clients";
 import { NewQuote } from "./pages/NewQuote";
+import { PolicyCancel } from "./pages/PolicyCancel";
+import { PolicyChange } from "./pages/PolicyChange";
 import { PolicyView } from "./pages/PolicyView";
 import { QuoteList } from "./pages/QuoteList";
 import { QuoteView } from "./pages/QuoteView";
@@ -42,10 +44,12 @@ function SignedIn({ user }: { user: User }) {
 
   let page;
   if (role === "broker") {
-    const [section, id] = route;
+    const [section, id, action] = route;
     if (section === "quotes" && id === "new") page = <NewQuote api={client} />;
     else if (section === "quotes" && id) page = <QuoteView api={client} quoteId={id} />;
     else if (section === "clients") page = <Clients api={client} editing={id} />;
+    else if (section === "policies" && id && action === "change") page = <PolicyChange api={client} policyNumber={id} />;
+    else if (section === "policies" && id && action === "cancel") page = <PolicyCancel api={client} policyNumber={id} />;
     else if (section === "policies" && id) page = <PolicyView api={client} policyNumber={id} />;
     else page = <QuoteList api={client} />;
   } else if (role === "underwriter") {

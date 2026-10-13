@@ -64,3 +64,7 @@ pre { font-size: 0.8rem; background: var(--bg); padding: 0.5rem; overflow: auto;
 .pair { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; }
 @media (max-width: 520px) { .pair { grid-template-columns: 1fr; } }
 .client-form { display: grid; gap: 0.75rem; }
+a.button { display: inline-block; }
+a.button.secondary { background: transparent; color: var(--accent); border: 1px solid var(--accent); }
+button.danger { background: var(--bad); }
+.actions { margin: 1rem 0; }

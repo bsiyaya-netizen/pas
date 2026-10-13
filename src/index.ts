@@ -18,13 +18,35 @@ export {
   referOption,
 } from "./quote/quote.js";
 export type { NewQuote, OptionStatus, Quote, QuoteOption, Referral } from "./quote/quote.js";
-export { versionOn } from "./policy/policy.js";
+export { CANCELLATION_REASONS, versionOn } from "./policy/policy.js";
+export {
+  billingPeriod,
+  cancel,
+  endorse,
+  PolicyChangeError,
+  previewCancellation,
+  previewEndorsement,
+  ratedProduct,
+} from "./policy/changes.js";
+export type {
+  CancellationPreview,
+  CancellationRequest,
+  EndorsementPreview,
+  EndorsementRequest,
+} from "./policy/changes.js";
 export { currentCover, formatDate, formatRand, policyDocument } from "./documents/policy-document.js";
 export type { DocumentParties, PolicyDocument } from "./documents/policy-document.js";
 export { renderCertificate, renderSchedule } from "./documents/render.js";
-export type { Policy, PolicyTerm, PolicyTransaction, PolicyVersion } from "./policy/policy.js";
-export { isValidFspNumber } from "./parties.js";
-export type { Broker, Client, Underwriter } from "./parties.js";
+export type {
+  Cancellation,
+  CancellationReason,
+  Policy,
+  PolicyTerm,
+  PolicyTransaction,
+  PolicyVersion,
+} from "./policy/policy.js";
+export { isValidFspNumber, isValidSaIdNumber } from "./parties.js";
+export type { Address, Broker, Client, Underwriter } from "./parties.js";
 export { fromPool } from "./db/database.js";
 export type { Database, Queryable } from "./db/database.js";
 export { migrate } from "./db/migrate.js";

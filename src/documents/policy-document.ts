@@ -17,7 +17,10 @@ export interface PolicyDocument {
   insured: { name: string; idNumber?: string; address?: string; contact?: string };
   broker: { name: string; fspNumber: string };
   insurer: { name: string; registeredName?: string; fspNumber?: string };
+  /** `to` is the last day of cover: the term's last day, or the day before a cancellation. */
   term: { number: number; from: string; to: string };
+  /** First day without cover, when the policy has been cancelled. */
+  cancelledFrom?: string;
   version: { number: number; effectiveFrom: string };
   /** Monthly amounts in cents. */
   premium: { total: number; vat: number; excludingVat: number; vatRate: number };
@@ -71,7 +74,12 @@ export function policyDocument(policy: Policy, parties: DocumentParties): Policy
     },
     broker: { name: broker.name, fspNumber: broker.fspNumber },
     insurer: { name: policy.insurer, ...product.insurerDetails },
-    term: { number: term.number, from: term.start, to: addDays(term.end, -1) },
+    term: {
+      number: term.number,
+      from: term.start,
+      to: addDays(policy.cancellation && policy.cancellation.effectiveDate < term.end ? policy.cancellation.effectiveDate : term.end, -1),
+    },
+    ...(policy.cancellation && { cancelledFrom: policy.cancellation.effectiveDate }),
     version: { number: version.number, effectiveFrom: version.effectiveFrom },
     premium: {
       total: rating.totalPremium,
