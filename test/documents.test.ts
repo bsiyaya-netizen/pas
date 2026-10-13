@@ -8,12 +8,20 @@ import { catalog, cleanRisk, productB } from "./fixtures.js";
 
 const broker: Broker = { id: "brk-1", name: "Leetile Brokers", fspNumber: "51234" };
 const client = { id: "cli-1", name: "T. Mokoena" };
+const fullClient = {
+  ...client,
+  idNumber: "8001015009087",
+  phone: "082 123 4567",
+  email: "t.mokoena@example.com",
+  address: { line1: "12 Jacaranda Street", suburb: "Rosebank", city: "Johannesburg", postalCode: "2196" },
+};
+const vehicle = { ...cleanRisk.vehicle, make: "Toyota", model: "Corolla Cross 1.8 XS", year: 2023, registration: "CA 123-456" };
 const today = { now: () => new Date("2026-10-13T10:00:00Z") };
 
-function issuedPolicy(coverages: string[] = []) {
+function issuedPolicy(coverages: string[] = [], risk: Record<string, unknown> = cleanRisk) {
   const quote = createQuote(
     catalog,
-    { broker, client, line: "motor", effectiveDate: "2026-11-01", risk: cleanRisk, coverages },
+    { broker, client, line: "motor", effectiveDate: "2026-11-01", risk, coverages },
     { ...today, quoteId: "q-1" },
   );
   return bindQuote(quote, "example-b-motor", broker, { ...today, policyNumber: "POL-0000001", transactionId: "t-1" })
@@ -63,6 +71,32 @@ describe("policyDocument", () => {
       },
       { heading: "Excess", rows: [["Basic excess per claim", "R5 000"]] },
     ]);
+  });
+});
+
+describe("client and vehicle details", () => {
+  it("prints the policyholder's ID, address and contact details and identifies the vehicle", () => {
+    const d = policyDocument(issuedPolicy([], { ...cleanRisk, vehicle }), {
+      broker,
+      client: fullClient,
+      product: productB,
+      issuedOn: "2026-10-13",
+    });
+    expect(d.insured).toEqual({
+      name: "T. Mokoena",
+      idNumber: "8001015009087",
+      address: "12 Jacaranda Street, Rosebank, Johannesburg, 2196",
+      contact: "082 123 4567, t.mokoena@example.com",
+    });
+    expect(d.risk[0]!.rows.slice(0, 2)).toEqual([
+      ["Vehicle", "2023 Toyota Corolla Cross 1.8 XS"],
+      ["Registration", "CA 123-456"],
+    ]);
+  });
+
+  it("leaves out details that were never captured", () => {
+    expect(doc().insured).toEqual({ name: "T. Mokoena" });
+    expect(doc().risk[0]!.rows[0]![0]).toBe("Sum insured");
   });
 });
 

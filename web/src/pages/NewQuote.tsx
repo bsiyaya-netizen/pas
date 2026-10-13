@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from "react";
 import type { Api } from "../api";
-import { go } from "../router";
+import { ClientForm, missingDetails } from "../components/ClientForm";
+import { go, href } from "../router";
 import { useLoad } from "../useLoad";
 
 /** Motor quote capture. Home and commercial property forms follow once their products are loaded. */
@@ -19,8 +20,10 @@ export function NewQuote({ api }: { api: Api }) {
   const products = useLoad(() => api.products("motor"), [api]);
   const [error, setError] = useState<string>();
   const [busy, setBusy] = useState(false);
-  const [newClient, setNewClient] = useState("");
+  const [adding, setAdding] = useState(false);
   const [clientId, setClientId] = useState("");
+  const selected = clients.data?.find((c) => c.id === clientId);
+  const missing = selected ? missingDetails(selected) : [];
 
   const optional = [
     ...new Map(
@@ -28,22 +31,11 @@ export function NewQuote({ api }: { api: Api }) {
     ),
   ];
 
-  async function addClient() {
-    if (!newClient.trim()) return;
-    try {
-      const client = await api.addClient(newClient.trim());
-      clients.setData([...(clients.data ?? []), client]);
-      setClientId(client.id);
-      setNewClient("");
-    } catch (e) {
-      setError((e as Error).message);
-    }
-  }
-
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const f = new FormData(event.currentTarget);
     const num = (name: string) => Number(f.get(name));
+    const text = (name: string) => String(f.get(name) ?? "").trim();
     setBusy(true);
     setError(undefined);
     try {
@@ -55,7 +47,14 @@ export function NewQuote({ api }: { api: Api }) {
         risk: {
           territory: f.get("territory"),
           excessOption: num("excessOption"),
-          vehicle: { value: num("vehicleValue"), use: f.get("use") },
+          vehicle: {
+            value: num("vehicleValue"),
+            use: f.get("use"),
+            make: text("make"),
+            model: text("model"),
+            year: num("year"),
+            ...(text("registration") && { registration: text("registration").toUpperCase() }),
+          },
           driver: {
             age: num("age"),
             claimsLast3Years: num("claims"),
@@ -90,12 +89,27 @@ export function NewQuote({ api }: { api: Api }) {
               ))}
             </select>
           </label>
-          <div className="inline">
-            <input placeholder="New client name" value={newClient} onChange={(e) => setNewClient(e.target.value)} />
-            <button type="button" className="secondary" onClick={addClient}>
-              Add client
+          {missing.length > 0 && !adding && (
+            <p className="note">
+              Documents for this client will leave out their {missing.join(" and ")}.{" "}
+              <a href={href("clients", clientId)}>Add them</a>
+            </p>
+          )}
+          {adding ? (
+            <ClientForm
+              onSave={async (details) => {
+                const client = await api.addClient(details);
+                clients.setData([...(clients.data ?? []), client]);
+                setClientId(client.id);
+                setAdding(false);
+              }}
+              onCancel={() => setAdding(false)}
+            />
+          ) : (
+            <button type="button" className="secondary" onClick={() => setAdding(true)}>
+              Add a new client
             </button>
-          </div>
+          )}
         </fieldset>
 
         <fieldset>
@@ -121,6 +135,26 @@ export function NewQuote({ api }: { api: Api }) {
 
         <fieldset>
           <legend>Vehicle</legend>
+          <div className="pair">
+            <label>
+              Make
+              <input name="make" required placeholder="e.g. Toyota" />
+            </label>
+            <label>
+              Model
+              <input name="model" required placeholder="e.g. Corolla Cross 1.8 XS" />
+            </label>
+          </div>
+          <div className="pair">
+            <label>
+              Year
+              <input type="number" name="year" min="1950" max={new Date().getFullYear() + 1} required />
+            </label>
+            <label>
+              Registration number
+              <input name="registration" placeholder="Leave blank if not yet registered" />
+            </label>
+          </div>
           <label>
             Value (R)
             <input type="number" name="vehicleValue" min="1000" step="1000" required />

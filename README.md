@@ -74,6 +74,7 @@ provider works). This server never stores passwords.
 | broker | `POST /quotes`, `GET /quotes`, `GET /quotes/:id` | Quote every insurer; list and view own quotes |
 | broker | `POST /quotes/:id/options/:productId/refer` | Send an option to the insurer's underwriters |
 | broker | `POST /quotes/:id/options/:productId/bind` | Bind and issue the policy |
+| broker | `PUT /clients/:id` | Update a client's ID number, contact details and address |
 | broker | `GET /policies/:number` | View own policy |
 | broker | `GET /policies/:number/documents/schedule` | Policy schedule PDF |
 | broker | `GET /policies/:number/documents/certificate` | Certificate of insurance PDF |
@@ -89,7 +90,9 @@ The policy schedule and certificate of insurance are A4 PDFs drawn on request
 from the policy record (`src/documents/`), so they always match the current
 version and nothing is stored. The schedule shows the parties with FSP numbers,
 the period, the insured risk, each section's premium with VAT, the broker's
-commission, and how to complain to the insurer or the ombuds. Each product file
+commission, and how to complain to the insurer or the ombuds. Client ID numbers
+(checked against the South African ID check digit), contact details, address,
+and the vehicle's make, model, year and registration print when captured. Each product file
 carries the insurer's registered name and FSP number in `insurerDetails`.
 
 ## Broker portal

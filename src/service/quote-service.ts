@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import type { Database, Queryable } from "../db/database.js";
-import { isValidFspNumber, type Broker, type Client, type Underwriter } from "../parties.js";
+import { isValidFspNumber, isValidSaIdNumber, type Broker, type Client, type Underwriter } from "../parties.js";
 import { isoDate } from "../dates.js";
 import { policyDocument, type PolicyDocument } from "../documents/policy-document.js";
 import type { Policy } from "../policy/policy.js";
@@ -65,12 +65,23 @@ export class QuoteService {
 
   async addClient(brokerId: string, input: Omit<Client, "id">): Promise<Client> {
     await this.broker(brokerId);
-    const client = { id: this.newId(), ...input };
-    await this.db.query("insert into clients (id, broker_id, name) values ($1, $2, $3)", [
-      client.id,
-      brokerId,
-      client.name,
-    ]);
+    const client = { id: this.newId(), ...checkClient(input) };
+    await this.db.query(
+      "insert into clients (id, broker_id, name, id_number, email, phone, address) values ($1, $2, $3, $4, $5, $6, $7)",
+      [client.id, brokerId, client.name, client.idNumber ?? null, client.email ?? null, client.phone ?? null, client.address ?? null],
+    );
+    return client;
+  }
+
+  /** Replaces a client's details; documents issued afterwards show the new ones. */
+  async updateClient(brokerId: string, clientId: string, input: Omit<Client, "id">): Promise<Client> {
+    const client = { id: clientId, ...checkClient(input) };
+    const { rows } = await this.db.query(
+      `update clients set name = $3, id_number = $4, email = $5, phone = $6, address = $7
+       where id = $1 and broker_id = $2 returning id`,
+      [clientId, brokerId, client.name, client.idNumber ?? null, client.email ?? null, client.phone ?? null, client.address ?? null],
+    );
+    if (!rows[0]) throw new NotFoundError(`Client ${clientId}`);
     return client;
   }
 
@@ -101,11 +112,11 @@ export class QuoteService {
   }
 
   async listClients(brokerId: string): Promise<Client[]> {
-    const { rows } = await this.db.query<Client>(
-      "select id, name from clients where broker_id = $1 order by name",
+    const { rows } = await this.db.query<ClientRow>(
+      `select ${CLIENT_COLUMNS} from clients where broker_id = $1 order by name`,
       [brokerId],
     );
-    return rows;
+    return rows.map(toClient);
   }
 
   async addUnderwriter(input: Omit<Underwriter, "id">): Promise<Underwriter> {
@@ -125,12 +136,12 @@ export class QuoteService {
     details: Omit<NewQuote, "broker" | "client">,
   ): Promise<Quote> {
     const broker = await this.broker(brokerId);
-    const { rows } = await this.db.query<{ id: string; name: string }>(
-      "select id, name from clients where id = $1 and broker_id = $2",
+    const { rows } = await this.db.query<ClientRow>(
+      `select ${CLIENT_COLUMNS} from clients where id = $1 and broker_id = $2`,
       [clientId, brokerId],
     );
-    const client = rows[0];
-    if (!client) throw new NotFoundError(`Client ${clientId}`);
+    if (!rows[0]) throw new NotFoundError(`Client ${clientId}`);
+    const client = toClient(rows[0]);
 
     const quote = createQuote(this.catalog, { ...details, broker, client }, { ...this.deps, quoteId: this.newId() });
     await this.db.query(
@@ -245,12 +256,14 @@ export class QuoteService {
   async getPolicyDocument(brokerId: string, policyNumber: string): Promise<PolicyDocument> {
     const policy = await this.getPolicy(brokerId, policyNumber);
     const broker = await this.broker(brokerId);
-    const { rows } = await this.db.query<Client>("select id, name from clients where id = $1", [policy.clientId]);
+    const { rows } = await this.db.query<ClientRow>(`select ${CLIENT_COLUMNS} from clients where id = $1`, [
+      policy.clientId,
+    ]);
     if (!rows[0]) throw new NotFoundError(`Client ${policy.clientId}`);
     const rating = policy.terms.at(-1)?.versions.at(-1)?.rating;
     const product = rating && this.catalog.get(rating.productId, rating.productVersion);
     if (!product) throw new Error(`Product ${policy.productId} for policy ${policyNumber} is not loaded`);
-    return policyDocument(policy, { broker, client: rows[0], product, issuedOn: isoDate(this.deps.now()) });
+    return policyDocument(policy, { broker, client: toClient(rows[0]), product, issuedOn: isoDate(this.deps.now()) });
   }
 
   private async underwriter(underwriterId: string): Promise<Underwriter> {
@@ -296,4 +309,33 @@ export class QuoteService {
     if (rows.length === 0) throw new ConflictError(`Quote ${quote.id}`);
     return quote;
   }
+}
+
+const CLIENT_COLUMNS = "id, name, id_number, email, phone, address";
+
+interface ClientRow {
+  id: string;
+  name: string;
+  id_number: string | null;
+  email: string | null;
+  phone: string | null;
+  address: Client["address"] | null;
+}
+
+function toClient(row: ClientRow): Client {
+  return {
+    id: row.id,
+    name: row.name,
+    ...(row.id_number && { idNumber: row.id_number }),
+    ...(row.email && { email: row.email }),
+    ...(row.phone && { phone: row.phone }),
+    ...(row.address && { address: row.address }),
+  };
+}
+
+function checkClient(input: Omit<Client, "id">): Omit<Client, "id"> {
+  if (input.idNumber !== undefined && !isValidSaIdNumber(input.idNumber)) {
+    throw new QuoteError(`"${input.idNumber}" is not a valid South African ID number`);
+  }
+  return input;
 }

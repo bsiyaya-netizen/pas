@@ -163,6 +163,9 @@ export async function renderSchedule(doc: PolicyDocument): Promise<Uint8Array> {
   layout.heading("Policy");
   layout.field("Policy number", doc.policyNumber);
   layout.field("Policyholder", doc.insured.name);
+  if (doc.insured.idNumber) layout.field("ID number", doc.insured.idNumber);
+  if (doc.insured.address) layout.field("Address", doc.insured.address);
+  if (doc.insured.contact) layout.field("Contact", doc.insured.contact);
   layout.field("Period of insurance", `${formatDate(doc.term.from)} to ${formatDate(doc.term.to)}, both days included`);
   layout.field("Schedule effective from", `${formatDate(doc.version.effectiveFrom)} (version ${doc.version.number})`);
   layout.field("Date issued", formatDate(doc.issuedOn));
@@ -225,6 +228,7 @@ export async function renderCertificate(doc: PolicyDocument): Promise<Uint8Array
   layout.heading("Cover");
   layout.field("Policy number", doc.policyNumber);
   layout.field("Policyholder", doc.insured.name);
+  if (doc.insured.idNumber) layout.field("ID number", doc.insured.idNumber);
   layout.field("Insurer", insurerLine(doc));
   layout.field("Period of insurance", `${formatDate(doc.term.from)} to ${formatDate(doc.term.to)}, both days included`);
   layout.field("Cover", doc.sections.map((s) => s.name).join(", "));

@@ -2,6 +2,7 @@ import type { User } from "oidc-client-ts";
 import { useEffect, useMemo, useState } from "react";
 import { api } from "./api";
 import { currentUser, roleOf, userManager } from "./auth";
+import { Clients } from "./pages/Clients";
 import { NewQuote } from "./pages/NewQuote";
 import { PolicyView } from "./pages/PolicyView";
 import { QuoteList } from "./pages/QuoteList";
@@ -44,6 +45,7 @@ function SignedIn({ user }: { user: User }) {
     const [section, id] = route;
     if (section === "quotes" && id === "new") page = <NewQuote api={client} />;
     else if (section === "quotes" && id) page = <QuoteView api={client} quoteId={id} />;
+    else if (section === "clients") page = <Clients api={client} editing={id} />;
     else if (section === "policies" && id) page = <PolicyView api={client} policyNumber={id} />;
     else page = <QuoteList api={client} />;
   } else if (role === "underwriter") {
@@ -61,6 +63,7 @@ function SignedIn({ user }: { user: User }) {
             <>
               <a href={href("quotes")}>Quotes</a>
               <a href={href("quotes", "new")}>New quote</a>
+              <a href={href("clients")}>Clients</a>
             </>
           )}
           {role === "underwriter" && <a href={href("referrals")}>Referrals</a>}

@@ -139,6 +139,32 @@ describe("broker journey", () => {
     expect((await call("GET", `/policies/${policyNumber}/documents/schedule`, other.bearer)).status).toBe(404);
   });
 
+  it("captures and updates client details, rejecting an invalid ID number", async () => {
+    const { bearer } = await onboardBroker();
+    const details = {
+      name: "T. Mokoena",
+      idNumber: "8001015009087",
+      phone: "082 123 4567",
+      email: "",
+      address: { line1: "12 Jacaranda Street", city: "Johannesburg", postalCode: "2196" },
+    };
+    const created = await call("POST", "/clients", bearer, details);
+    expect(created.status).toBe(201);
+    const { email: _blank, ...expected } = details;
+    expect((await call("GET", "/clients", bearer)).body).toEqual([{ id: created.body.id, ...expected }]);
+
+    const bad = await call("POST", "/clients", bearer, { ...details, idNumber: "8001015009088" });
+    expect(bad).toMatchObject({ status: 422, body: { error: expect.stringMatching(/not a valid South African ID/) } });
+    expect((await call("POST", "/clients", bearer, { ...details, address: { line1: "x", city: "y", postalCode: "21" } })).status).toBe(400);
+
+    const updated = await call("PUT", `/clients/${created.body.id}`, bearer, { name: "Thandi Mokoena", email: "t@example.com" });
+    expect(updated.status).toBe(200);
+    expect((await call("GET", "/clients", bearer)).body).toEqual([{ id: created.body.id, name: "Thandi Mokoena", email: "t@example.com" }]);
+
+    const other = await onboardBroker("22222");
+    expect((await call("PUT", `/clients/${created.body.id}`, other.bearer, { name: "Taken" })).status).toBe(404);
+  });
+
   it("hides one broker's records from another", async () => {
     const a = await onboardBroker("11111");
     const b = await onboardBroker("22222");

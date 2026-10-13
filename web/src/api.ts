@@ -1,9 +1,23 @@
 /** Typed calls to the PAS API. Shapes mirror the server's JSON responses. */
 
+export interface Address {
+  line1: string;
+  line2?: string;
+  suburb?: string;
+  city: string;
+  postalCode: string;
+}
+
 export interface Client {
   id: string;
   name: string;
+  idNumber?: string;
+  email?: string;
+  phone?: string;
+  address?: Address;
 }
+
+export type ClientDetails = Omit<Client, "id">;
 
 export interface RuleHit {
   ruleId: string;
@@ -76,7 +90,7 @@ const base = import.meta.env.VITE_API_BASE ?? "/api";
 export type PolicyDocumentKind = "schedule" | "certificate";
 
 export function api(token: string) {
-  async function call<T>(method: "GET" | "POST", path: string, body?: unknown): Promise<T> {
+  async function call<T>(method: "GET" | "POST" | "PUT", path: string, body?: unknown): Promise<T> {
     const res = await fetch(`${base}${path}`, {
       method,
       headers: {
@@ -95,7 +109,9 @@ export function api(token: string) {
 
   return {
     clients: () => call<Client[]>("GET", "/clients"),
-    addClient: (name: string) => call<Client>("POST", "/clients", { name }),
+    addClient: (details: ClientDetails) => call<Client>("POST", "/clients", details),
+    updateClient: (id: string, details: ClientDetails) =>
+      call<Client>("PUT", `/clients/${encodeURIComponent(id)}`, details),
     products: (line: string) => call<Product[]>("GET", `/products?line=${encodeURIComponent(line)}`),
     quotes: () => call<Quote[]>("GET", "/quotes"),
     quote: (id: string) => call<Quote>("GET", `/quotes/${encodeURIComponent(id)}`),

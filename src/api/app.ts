@@ -36,7 +36,26 @@ const UserLinkBody = z.union([
   z.object({ subject: z.string().min(1), brokerId: z.string().min(1) }).strict(),
   z.object({ subject: z.string().min(1), underwriterId: z.string().min(1) }).strict(),
 ]);
-const NewClient = z.object({ name: Name }).strict();
+const Optional = (schema: z.ZodString) =>
+  z.preprocess((v) => (typeof v === "string" && v.trim() === "" ? undefined : v), schema.optional());
+const ClientBody = z
+  .object({
+    name: Name,
+    idNumber: Optional(z.string().trim().regex(/^\d{13}$/, "Use the 13-digit ID number")),
+    email: Optional(z.string().trim().email()),
+    phone: Optional(z.string().trim().regex(/^\+?[\d ]{9,15}$/, "Use digits, e.g. 082 123 4567")),
+    address: z
+      .object({
+        line1: Name,
+        line2: Optional(z.string().trim().max(200)),
+        suburb: Optional(z.string().trim().max(200)),
+        city: Name,
+        postalCode: z.string().trim().regex(/^\d{4}$/, "Use the 4-digit postal code"),
+      })
+      .strict()
+      .optional(),
+  })
+  .strict();
 const NewQuote = z
   .object({
     clientId: z.string().min(1),
@@ -119,9 +138,13 @@ export function buildApp(deps: AppDeps): FastifyInstance {
   // Broker: clients, quotes, referrals and binding.
   app.post("/clients", async (request, reply) => {
     const { brokerId } = requireRole(request, "broker");
-    return reply.code(201).send(await service.addClient(brokerId, NewClient.parse(request.body)));
+    return reply.code(201).send(await service.addClient(brokerId, ClientBody.parse(request.body)));
   });
   app.get("/clients", async (request) => service.listClients(requireRole(request, "broker").brokerId));
+  app.put("/clients/:clientId", async (request) => {
+    const { clientId } = z.object({ clientId: z.string() }).parse(request.params);
+    return service.updateClient(requireRole(request, "broker").brokerId, clientId, ClientBody.parse(request.body));
+  });
   app.post("/quotes", async (request, reply) => {
     const { brokerId } = requireRole(request, "broker");
     const { clientId, ...details } = NewQuote.parse(request.body);
