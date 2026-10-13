@@ -4,7 +4,8 @@ Policy Administration System for a South African short-term insurance broker:
 motor, home and commercial property, quoted across several insurers.
 
 Built so far: the **product model and rating engine**, **quote, referral
-and bind**, and **PostgreSQL storage**. Later slices add documents, endorsements, cancellations and
+and bind**, **PostgreSQL storage**, and the **HTTP API** the broker portal
+will use. Later slices add documents, endorsements, cancellations and
 renewals (see the design doc).
 
 ## How rating works
@@ -52,6 +53,28 @@ PGlite, an in-memory Postgres, so they need no database server.
 
 The two products in `products/` are **illustrative only**: fictional insurers
 and made-up rates, used for tests.
+
+## HTTP API
+
+`npm run build && npm start` runs the API (Fastify). Every route except
+`/health` needs a bearer token from your identity provider (OIDC), with a
+`role` claim of `broker`, `underwriter` or `admin`, plus `broker_id` or
+`underwriter_id`. This server never stores passwords.
+
+| Who | Route | Does |
+| --- | --- | --- |
+| admin | `POST /brokers`, `POST /underwriters` | Onboard a broker (FSP number) or an insurer's underwriter |
+| anyone | `GET /products?line=motor` | Products on sale for a line |
+| broker | `POST /clients`, `GET /clients` | Add a client; list own clients |
+| broker | `POST /quotes`, `GET /quotes`, `GET /quotes/:id` | Quote every insurer; list and view own quotes |
+| broker | `POST /quotes/:id/options/:productId/refer` | Send an option to the insurer's underwriters |
+| broker | `POST /quotes/:id/options/:productId/bind` | Bind and issue the policy |
+| broker | `GET /policies/:number` | View own policy |
+| underwriter | `GET /referrals` | Pending referrals for their insurer |
+| underwriter | `POST /quotes/:id/options/:productId/decision` | Approve or decline, with a note |
+
+Environment: `DATABASE_URL`, `AUTH_ISSUER`, `AUTH_AUDIENCE`, `AUTH_JWKS_URL`,
+optional `PORT` (3000) and `PRODUCTS_DIR` (`./products`). Migrations run on start.
 
 ## Commands
 

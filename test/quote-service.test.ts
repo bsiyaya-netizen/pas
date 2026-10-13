@@ -27,7 +27,7 @@ describe("migrations", () => {
   it("apply once and are skipped on the next run", async () => {
     expect(await migrate(db)).toEqual([]);
     const { rows } = await db.query<{ version: number }>("select version from schema_migrations");
-    expect(rows.map((r) => r.version)).toEqual([1]);
+    expect(rows.map((r) => r.version)).toEqual([1, 2]);
   });
 });
 
@@ -70,11 +70,14 @@ describe("QuoteService", () => {
 
   it("runs a referral through an underwriter and then binds", async () => {
     const { broker, client } = await setup();
-    const uw = await service.addUnderwriter({ name: "Senior UW", authority: 2 });
+    const uw = await service.addUnderwriter({ name: "Senior UW", insurer: "Example Insurer A", authority: 2 });
     const quote = await service.createQuote(broker.id, client.id, { ...details, risk: claimsRisk });
 
     await expect(service.bind(broker.id, quote.id, "example-a-motor")).rejects.toThrow(/needs_referral/);
     await service.refer(broker.id, quote.id, "example-a-motor");
+    expect((await service.listPendingReferrals(uw.id)).map((q) => q.id)).toEqual([quote.id]);
+    const otherUw = await service.addUnderwriter({ name: "B UW", insurer: "Example Insurer B", authority: 2 });
+    expect(await service.listPendingReferrals(otherUw.id)).toEqual([]);
     const decided = await service.decide(uw.id, quote.id, "example-a-motor", "approved", "Hail claims only");
     expect(decided.options.find((o) => o.productId === "example-a-motor")!.referral?.status).toBe("approved");
 

@@ -13,8 +13,8 @@ import { catalog, cleanRisk } from "./fixtures.js";
 
 const broker: Broker = { id: "brk-1", name: "Leetile Brokers", fspNumber: "51234" };
 const otherBroker: Broker = { id: "brk-2", name: "Other Brokers", fspNumber: "40000" };
-const junior: Underwriter = { id: "uw-1", name: "Junior UW", authority: 1 };
-const senior: Underwriter = { id: "uw-2", name: "Senior UW", authority: 2 };
+const junior: Underwriter = { id: "uw-1", name: "Junior UW", insurer: "Example Insurer A", authority: 1 };
+const senior: Underwriter = { id: "uw-2", name: "Senior UW", insurer: "Example Insurer A", authority: 2 };
 
 const at = (iso: string) => ({ now: () => new Date(iso) });
 const today = at("2026-10-13T10:00:00Z");
@@ -119,6 +119,14 @@ describe("referrals", () => {
     expect(() => decideReferral(q, "example-a-motor", junior, "approved", "ok", today)).toThrow(/needs 2/);
     expect(optionStatus(decideReferral(q, "example-a-motor", senior, "approved", "Tracker fitted", today).options[1]!)).toBe(
       "bindable",
+    );
+  });
+
+  it("only lets the option's own insurer decide", () => {
+    const q = referOption(quote(claimsRisk), "example-a-motor", today);
+    const otherInsurer = { ...senior, insurer: "Example Insurer B" };
+    expect(() => decideReferral(q, "example-a-motor", otherInsurer, "approved", "ok", today)).toThrow(
+      /cannot decide referrals for Example Insurer A/,
     );
   });
 
