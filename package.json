@@ -12,7 +12,8 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run",
     "start": "node dist/src/main.js",
-    "dev:api": "node scripts/dev-api.mjs"
+    "dev:api": "node scripts/dev-api.mjs",
+    "demo": "npm run build && node scripts/demo.mjs"
   },
   "dependencies": {
     "fastify": "^5.12.5",

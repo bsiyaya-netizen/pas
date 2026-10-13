@@ -4,9 +4,17 @@ Policy Administration System for a South African short-term insurance broker:
 motor, home and commercial property, quoted across several insurers.
 
 Built so far: the **product model and rating engine**, **quote, referral
-and bind**, **PostgreSQL storage**, the **HTTP API**, and the **broker portal**
-(`web/`). Later slices add documents, endorsements, cancellations and
-renewals (see the design doc).
+and bind**, **PostgreSQL storage**, the **HTTP API**, the **broker portal**
+(`web/`), **policy documents**, **changes and cancellations**, and the
+**dashboard and reports**. Renewals come next (see the design doc).
+
+## Try it
+
+Open a GitHub Codespace on this repository (Code, Codespaces, Create
+codespace on main) and the portal opens with sample data. Locally, run
+`npm ci && npm --prefix web ci && npm run demo` and open
+http://localhost:5173. [docs/testing.md](docs/testing.md) has the steps and a
+list of journeys to try.
 
 ## How rating works
 
