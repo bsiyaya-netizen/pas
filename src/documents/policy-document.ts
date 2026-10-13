@@ -1,6 +1,6 @@
 import type { Policy, PolicyTerm, PolicyVersion } from "../policy/policy.js";
 import type { Product } from "../product/schema.js";
-import type { Broker, Client } from "../parties.js";
+import type { Address, Broker, Client } from "../parties.js";
 import { addDays } from "../dates.js";
 import { readPath } from "../rating/engine.js";
 
@@ -14,10 +14,13 @@ export interface PolicyDocument {
   issuedOn: string;
   lineName: string;
   productName: string;
-  insured: { name: string };
+  insured: { name: string; idNumber?: string; address?: string; contact?: string };
   broker: { name: string; fspNumber: string };
   insurer: { name: string; registeredName?: string; fspNumber?: string };
+  /** `to` is the last day of cover: the term's last day, or the day before a cancellation. */
   term: { number: number; from: string; to: string };
+  /** First day without cover, when the policy has been cancelled. */
+  cancelledFrom?: string;
   version: { number: number; effectiveFrom: string };
   /** Monthly amounts in cents. */
   premium: { total: number; vat: number; excludingVat: number; vatRate: number };
@@ -63,10 +66,20 @@ export function policyDocument(policy: Policy, parties: DocumentParties): Policy
     issuedOn,
     lineName: LINE_NAMES[policy.line],
     productName: product.name,
-    insured: { name: client.name },
+    insured: {
+      name: client.name,
+      ...(client.idNumber && { idNumber: client.idNumber }),
+      ...(client.address && { address: formatAddress(client.address) }),
+      ...((client.phone || client.email) && { contact: [client.phone, client.email].filter(Boolean).join(", ") }),
+    },
     broker: { name: broker.name, fspNumber: broker.fspNumber },
     insurer: { name: policy.insurer, ...product.insurerDetails },
-    term: { number: term.number, from: term.start, to: addDays(term.end, -1) },
+    term: {
+      number: term.number,
+      from: term.start,
+      to: addDays(policy.cancellation && policy.cancellation.effectiveDate < term.end ? policy.cancellation.effectiveDate : term.end, -1),
+    },
+    ...(policy.cancellation && { cancelledFrom: policy.cancellation.effectiveDate }),
     version: { number: version.number, effectiveFrom: version.effectiveFrom },
     premium: {
       total: rating.totalPremium,
@@ -111,6 +124,8 @@ function motorDetails(risk: Record<string, unknown>): Pick<PolicyDocument, "risk
       {
         heading: "Vehicle",
         rows: rows([
+          ["Vehicle", vehicleName(read("vehicle.year"), read("vehicle.make"), read("vehicle.model"))],
+          ["Registration", text(read("vehicle.registration"))],
           ["Sum insured", sumInsured === undefined ? undefined : formatRand(sumInsured, { cents: false })],
           ["Use", read("vehicle.use") === "business" ? "Business" : read("vehicle.use") === "private" ? "Private" : text(read("vehicle.use"))],
           ["Kept overnight in", TERRITORIES[String(read("territory"))] ?? text(read("territory"))],
@@ -132,6 +147,15 @@ function motorDetails(risk: Record<string, unknown>): Pick<PolicyDocument, "risk
       },
     ].filter((group) => group.rows.length > 0),
   };
+}
+
+function vehicleName(...parts: unknown[]): string | undefined {
+  const name = parts.filter((p) => p !== undefined && p !== null && p !== "").join(" ");
+  return name || undefined;
+}
+
+export function formatAddress(address: Address): string {
+  return [address.line1, address.line2, address.suburb, address.city, address.postalCode].filter(Boolean).join(", ");
 }
 
 function text(value: unknown): string | undefined {

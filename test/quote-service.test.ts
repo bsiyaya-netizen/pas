@@ -27,7 +27,7 @@ describe("migrations", () => {
   it("apply once and are skipped on the next run", async () => {
     expect(await migrate(db)).toEqual([]);
     const { rows } = await db.query<{ version: number }>("select version from schema_migrations");
-    expect(rows.map((r) => r.version)).toEqual([1, 2, 3]);
+    expect(rows.map((r) => r.version)).toEqual([1, 2, 3, 4, 5]);
   });
 });
 

@@ -4,6 +4,10 @@ import { formatDate, formatRand } from "../format";
 import { href } from "../router";
 import { useLoad } from "../useLoad";
 
+const TRANSACTION_LABEL = { new_business: "Policy issued", endorsement: "Cover changed", cancellation: "Cancelled" };
+const today = () => new Date().toISOString().slice(0, 10);
+const signed = (cents: number) => `${cents > 0 ? "+" : ""}${formatRand(cents)}`;
+
 export function PolicyView({ api, policyNumber }: { api: Api; policyNumber: string }) {
   const policy = useLoad(() => api.policy(policyNumber), [api, policyNumber]);
   const [busy, setBusy] = useState<PolicyDocumentKind>();
@@ -37,21 +41,67 @@ export function PolicyView({ api, policyNumber }: { api: Api; policyNumber: stri
         <dt>Insurer</dt>
         <dd>{p.insurer}</dd>
         <dt>Status</dt>
-        <dd>{p.status === "in_force" ? "In force" : p.status}</dd>
+        <dd>
+          {p.cancellation
+            ? `Cancelled. Cover ends on ${formatDate(p.cancellation.effectiveDate, -1)}`
+            : "In force"}
+        </dd>
         <dt>Period</dt>
         <dd>
-          {formatDate(term.start)} to {formatDate(term.end, -1)}, both days included
+          {formatDate(term.start)} to{" "}
+          {p.cancellation && p.cancellation.effectiveDate < term.end
+            ? formatDate(p.cancellation.effectiveDate, -1)
+            : formatDate(term.end, -1)}
+          , both days included
         </dd>
         <dt>Monthly premium</dt>
-        <dd>{version.rating ? `${formatRand(version.rating.totalPremium)} incl. VAT` : "–"}</dd>
+        <dd>
+          {formatRand(version.rating.totalPremium)} incl. VAT
+          {version.number > 1 && ` from ${formatDate(version.effectiveFrom)}`}
+        </dd>
       </dl>
+      {p.status === "in_force" && (
+        <div className="inline actions">
+          <a className="button" href={href("policies", p.policyNumber, "change")}>
+            Change cover
+          </a>
+          <a className="button secondary" href={href("policies", p.policyNumber, "cancel")}>
+            Cancel policy
+          </a>
+        </div>
+      )}
+      <h2>History</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>From</th>
+            <th>Change</th>
+            <th className="num">Monthly premium change</th>
+            <th className="num">Once-off for that month</th>
+          </tr>
+        </thead>
+        <tbody>
+          {p.transactions.map((t) => (
+            <tr key={t.id}>
+              <td>{formatDate(t.effectiveDate)}</td>
+              <td>{t.description ?? TRANSACTION_LABEL[t.type]}</td>
+              <td className="num">{signed(t.premiumDelta)}</td>
+              <td className="num">{t.proRataAdjustment ? signed(t.proRataAdjustment) : "–"}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
       <h2>Documents</h2>
       {error && <p className="error">{error}</p>}
       <div className="inline">
         <button disabled={busy !== undefined} onClick={() => download("schedule")}>
           {busy === "schedule" ? "Preparing…" : "Policy schedule (PDF)"}
         </button>
-        <button className="secondary" disabled={busy !== undefined} onClick={() => download("certificate")}>
+        <button
+          className="secondary"
+          disabled={busy !== undefined || (p.cancellation && p.cancellation.effectiveDate <= today())}
+          onClick={() => download("certificate")}
+        >
           {busy === "certificate" ? "Preparing…" : "Certificate of insurance (PDF)"}
         </button>
       </div>

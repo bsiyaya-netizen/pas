@@ -2,6 +2,8 @@ import Fastify, { type FastifyInstance, type FastifyRequest } from "fastify";
 import { z, ZodError } from "zod";
 import type { ProductCatalog } from "../product/catalog.js";
 import { LINES } from "../product/schema.js";
+import { PolicyChangeError } from "../policy/changes.js";
+import { CANCELLATION_REASONS } from "../policy/policy.js";
 import { QuoteError } from "../quote/quote.js";
 import { RatingError } from "../rating/engine.js";
 import { renderCertificate, renderSchedule } from "../documents/render.js";
@@ -36,7 +38,26 @@ const UserLinkBody = z.union([
   z.object({ subject: z.string().min(1), brokerId: z.string().min(1) }).strict(),
   z.object({ subject: z.string().min(1), underwriterId: z.string().min(1) }).strict(),
 ]);
-const NewClient = z.object({ name: Name }).strict();
+const Optional = (schema: z.ZodString) =>
+  z.preprocess((v) => (typeof v === "string" && v.trim() === "" ? undefined : v), schema.optional());
+const ClientBody = z
+  .object({
+    name: Name,
+    idNumber: Optional(z.string().trim().regex(/^\d{13}$/, "Use the 13-digit ID number")),
+    email: Optional(z.string().trim().email()),
+    phone: Optional(z.string().trim().regex(/^\+?[\d ]{9,15}$/, "Use digits, e.g. 082 123 4567")),
+    address: z
+      .object({
+        line1: Name,
+        line2: Optional(z.string().trim().max(200)),
+        suburb: Optional(z.string().trim().max(200)),
+        city: Name,
+        postalCode: z.string().trim().regex(/^\d{4}$/, "Use the 4-digit postal code"),
+      })
+      .strict()
+      .optional(),
+  })
+  .strict();
 const NewQuote = z
   .object({
     clientId: z.string().min(1),
@@ -45,6 +66,17 @@ const NewQuote = z
     risk: z.record(z.unknown()),
     coverages: z.array(z.string()).default([]),
   })
+  .strict();
+const Endorsement = z
+  .object({
+    effectiveDate: IsoDate,
+    risk: z.record(z.unknown()),
+    coverages: z.array(z.string()).default([]),
+    description: z.string().trim().max(500).optional(),
+  })
+  .strict();
+const Cancellation = z
+  .object({ effectiveDate: IsoDate, reason: z.enum(CANCELLATION_REASONS), note: z.string().trim().max(500).optional() })
   .strict();
 const Decision = z.object({ decision: z.enum(["approved", "declined"]), note: z.string().max(2000) }).strict();
 const OptionParams = z.object({ quoteId: z.string(), productId: z.string() });
@@ -65,7 +97,7 @@ export function buildApp(deps: AppDeps): FastifyInstance {
     if (error instanceof ForbiddenError) return reply.code(403).send({ error: error.message });
     if (error instanceof NotFoundError) return reply.code(404).send({ error: error.message });
     if (error instanceof ConflictError) return reply.code(409).send({ error: error.message });
-    if (error instanceof QuoteError || error instanceof RatingError) {
+    if (error instanceof QuoteError || error instanceof RatingError || error instanceof PolicyChangeError) {
       return reply.code(422).send({ error: error.message });
     }
     if (error instanceof ZodError) {
@@ -119,9 +151,13 @@ export function buildApp(deps: AppDeps): FastifyInstance {
   // Broker: clients, quotes, referrals and binding.
   app.post("/clients", async (request, reply) => {
     const { brokerId } = requireRole(request, "broker");
-    return reply.code(201).send(await service.addClient(brokerId, NewClient.parse(request.body)));
+    return reply.code(201).send(await service.addClient(brokerId, ClientBody.parse(request.body)));
   });
   app.get("/clients", async (request) => service.listClients(requireRole(request, "broker").brokerId));
+  app.put("/clients/:clientId", async (request) => {
+    const { clientId } = z.object({ clientId: z.string() }).parse(request.params);
+    return service.updateClient(requireRole(request, "broker").brokerId, clientId, ClientBody.parse(request.body));
+  });
   app.post("/quotes", async (request, reply) => {
     const { brokerId } = requireRole(request, "broker");
     const { clientId, ...details } = NewQuote.parse(request.body);
@@ -147,11 +183,35 @@ export function buildApp(deps: AppDeps): FastifyInstance {
     return service.getPolicy(requireRole(request, "broker").brokerId, policyNumber);
   });
 
+  const PolicyParams = z.object({ policyNumber: z.string() });
+  app.post("/policies/:policyNumber/endorsements/preview", async (request) => {
+    const { policyNumber } = PolicyParams.parse(request.params);
+    return service.previewEndorsement(requireRole(request, "broker").brokerId, policyNumber, Endorsement.parse(request.body));
+  });
+  app.post("/policies/:policyNumber/endorsements", async (request, reply) => {
+    const { policyNumber } = PolicyParams.parse(request.params);
+    const policy = await service.endorse(requireRole(request, "broker").brokerId, policyNumber, Endorsement.parse(request.body));
+    return reply.code(201).send(policy);
+  });
+  app.post("/policies/:policyNumber/cancellation/preview", async (request) => {
+    const { policyNumber } = PolicyParams.parse(request.params);
+    const { effectiveDate } = z.object({ effectiveDate: IsoDate }).strict().parse(request.body);
+    return service.previewCancellation(requireRole(request, "broker").brokerId, policyNumber, effectiveDate);
+  });
+  app.post("/policies/:policyNumber/cancellation", async (request, reply) => {
+    const { policyNumber } = PolicyParams.parse(request.params);
+    const policy = await service.cancel(requireRole(request, "broker").brokerId, policyNumber, Cancellation.parse(request.body));
+    return reply.code(201).send(policy);
+  });
+
   app.get("/policies/:policyNumber/documents/:kind", async (request, reply) => {
     const { policyNumber, kind } = z
       .object({ policyNumber: z.string(), kind: z.enum(["schedule", "certificate"]) })
       .parse(request.params);
     const doc = await service.getPolicyDocument(requireRole(request, "broker").brokerId, policyNumber);
+    if (kind === "certificate" && doc.cancelledFrom && doc.issuedOn >= doc.cancelledFrom) {
+      throw new PolicyChangeError(`Policy ${policyNumber} was cancelled from ${doc.cancelledFrom}; there is no cover to certify`);
+    }
     const pdf = kind === "schedule" ? await renderSchedule(doc) : await renderCertificate(doc);
     return reply
       .type("application/pdf")

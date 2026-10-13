@@ -74,7 +74,10 @@ provider works). This server never stores passwords.
 | broker | `POST /quotes`, `GET /quotes`, `GET /quotes/:id` | Quote every insurer; list and view own quotes |
 | broker | `POST /quotes/:id/options/:productId/refer` | Send an option to the insurer's underwriters |
 | broker | `POST /quotes/:id/options/:productId/bind` | Bind and issue the policy |
+| broker | `PUT /clients/:id` | Update a client's ID number, contact details and address |
 | broker | `GET /policies/:number` | View own policy |
+| broker | `POST /policies/:number/endorsements/preview`, `POST /policies/:number/endorsements` | Price, then apply, a mid-term change |
+| broker | `POST /policies/:number/cancellation/preview`, `POST /policies/:number/cancellation` | Work out the refund, then cancel |
 | broker | `GET /policies/:number/documents/schedule` | Policy schedule PDF |
 | broker | `GET /policies/:number/documents/certificate` | Certificate of insurance PDF |
 | underwriter | `GET /referrals` | Pending referrals for their insurer |
@@ -83,13 +86,29 @@ provider works). This server never stores passwords.
 Environment: `DATABASE_URL`, `AUTH_ISSUER`, `AUTH_AUDIENCE`, `AUTH_JWKS_URL`,
 optional `PORT` (3000) and `PRODUCTS_DIR` (`./products`). Migrations run on start.
 
+## Changes and cancellations
+
+A mid-term change (endorsement) adds a new policy version from its effective
+date and keeps the old one for earlier dates. It is priced on the product
+version the policy was written on, and runs the insurer's underwriting rules:
+a decline or a referral stops the change (referring changes to underwriters
+is not built yet). Cancellation ends cover from a date and blocks further
+changes. Neither can be backdated (`src/policy/changes.ts`).
+
+Premiums are monthly, paid in advance on the monthly anniversary of the
+start date. A change or cancellation part-way through a month carries a
+once-off pro-rata amount for the rest of that month: the premium difference
+for a change, or the unused premium returned for a cancellation.
+
 ## Policy documents
 
 The policy schedule and certificate of insurance are A4 PDFs drawn on request
 from the policy record (`src/documents/`), so they always match the current
 version and nothing is stored. The schedule shows the parties with FSP numbers,
 the period, the insured risk, each section's premium with VAT, the broker's
-commission, and how to complain to the insurer or the ombuds. Each product file
+commission, and how to complain to the insurer or the ombuds. Client ID numbers
+(checked against the South African ID check digit), contact details, address,
+and the vehicle's make, model, year and registration print when captured. Each product file
 carries the insurer's registered name and FSP number in `insurerDetails`.
 
 ## Broker portal
