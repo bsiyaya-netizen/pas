@@ -72,6 +72,32 @@ export class QuoteService {
     return client;
   }
 
+  /** Links an identity-provider user to the broker or underwriter they act for (replacing any old link). */
+  async linkUser(subject: string, link: { brokerId: string } | { underwriterId: string }): Promise<void> {
+    const brokerId = "brokerId" in link ? link.brokerId : null;
+    const underwriterId = "underwriterId" in link ? link.underwriterId : null;
+    if (brokerId) await this.broker(brokerId);
+    if (underwriterId) await this.underwriter(underwriterId);
+    await this.db.query(
+      `insert into user_links (subject, broker_id, underwriter_id) values ($1, $2, $3)
+       on conflict (subject) do update set broker_id = excluded.broker_id, underwriter_id = excluded.underwriter_id`,
+      [subject, brokerId, underwriterId],
+    );
+  }
+
+  async resolveLink(subject: string): Promise<{ brokerId?: string; underwriterId?: string } | undefined> {
+    const { rows } = await this.db.query<{ broker_id: string | null; underwriter_id: string | null }>(
+      "select broker_id, underwriter_id from user_links where subject = $1",
+      [subject],
+    );
+    const row = rows[0];
+    if (!row) return undefined;
+    return {
+      ...(row.broker_id && { brokerId: row.broker_id }),
+      ...(row.underwriter_id && { underwriterId: row.underwriter_id }),
+    };
+  }
+
   async listClients(brokerId: string): Promise<Client[]> {
     const { rows } = await this.db.query<Client>(
       "select id, name from clients where broker_id = $1 order by name",

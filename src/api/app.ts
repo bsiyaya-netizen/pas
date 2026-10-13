@@ -31,6 +31,10 @@ const NewBroker = z.object({ name: Name, fspNumber: z.string().trim() }).strict(
 const NewUnderwriter = z
   .object({ name: Name, insurer: Name, authority: z.number().int().positive() })
   .strict();
+const UserLinkBody = z.union([
+  z.object({ subject: z.string().min(1), brokerId: z.string().min(1) }).strict(),
+  z.object({ subject: z.string().min(1), underwriterId: z.string().min(1) }).strict(),
+]);
 const NewClient = z.object({ name: Name }).strict();
 const NewQuote = z
   .object({
@@ -56,7 +60,7 @@ export function buildApp(deps: AppDeps): FastifyInstance {
   });
 
   app.setErrorHandler((error, request, reply) => {
-    if (error instanceof AuthError) return reply.code(401).send({ error: error.message });
+    if (error instanceof AuthError) return reply.code(error.status).send({ error: error.message });
     if (error instanceof ForbiddenError) return reply.code(403).send({ error: error.message });
     if (error instanceof NotFoundError) return reply.code(404).send({ error: error.message });
     if (error instanceof ConflictError) return reply.code(409).send({ error: error.message });
@@ -88,6 +92,13 @@ export function buildApp(deps: AppDeps): FastifyInstance {
   app.post("/underwriters", async (request, reply) => {
     requireRole(request, "admin");
     return reply.code(201).send(await service.addUnderwriter(NewUnderwriter.parse(request.body)));
+  });
+
+  app.put("/user-links", async (request, reply) => {
+    requireRole(request, "admin");
+    const { subject, ...link } = UserLinkBody.parse(request.body);
+    await service.linkUser(subject, link);
+    return reply.code(204).send();
   });
 
   // Anyone signed in may see what is on sale.
