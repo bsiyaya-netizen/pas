@@ -57,13 +57,18 @@ and made-up rates, used for tests.
 ## HTTP API
 
 `npm run build && npm start` runs the API (Fastify). Every route except
-`/health` needs a bearer token from your identity provider (OIDC), with a
-`role` claim of `broker`, `underwriter` or `admin`, plus `broker_id` or
-`underwriter_id`. This server never stores passwords.
+`/health` needs a bearer access token from Microsoft Entra ID (any OIDC
+provider works). This server never stores passwords.
+
+- **Role** comes from the token's app roles (`Broker`, `Underwriter`,
+  `Admin`), assigned to people in Entra.
+- **Which broker or underwriter** a person acts for is linked here by an admin
+  with `PUT /user-links` (`{ "subject": "<Entra object id>", "brokerId": "..." }`).
 
 | Who | Route | Does |
 | --- | --- | --- |
 | admin | `POST /brokers`, `POST /underwriters` | Onboard a broker (FSP number) or an insurer's underwriter |
+| admin | `PUT /user-links` | Link a signed-in person to their broker or underwriter |
 | anyone | `GET /products?line=motor` | Products on sale for a line |
 | broker | `POST /clients`, `GET /clients` | Add a client; list own clients |
 | broker | `POST /quotes`, `GET /quotes`, `GET /quotes/:id` | Quote every insurer; list and view own quotes |

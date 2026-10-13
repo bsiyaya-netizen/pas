@@ -11,10 +11,11 @@ const secret = new TextEncoder().encode("test-secret-at-least-32-bytes-long!!");
 const issuer = "https://id.example.test";
 const audience = "pas-api";
 
-function token(claims: Record<string, string>, opts: { expiresIn?: string; aud?: string } = {}) {
-  return new SignJWT(claims)
+/** An Entra-style access token: app roles in `roles`, the user id in `oid`. */
+function token(oid: string, roles: string[], opts: { expiresIn?: string; aud?: string } = {}) {
+  return new SignJWT({ oid, roles })
     .setProtectedHeader({ alg: "HS256" })
-    .setSubject(`user-${claims.role}`)
+    .setSubject(`pairwise-${oid}`)
     .setIssuer(issuer)
     .setAudience(opts.aud ?? audience)
     .setIssuedAt()
@@ -23,33 +24,38 @@ function token(claims: Record<string, string>, opts: { expiresIn?: string; aud?:
 }
 
 let app: FastifyInstance;
+let service: QuoteService;
 let admin: string;
 
 beforeEach(async () => {
   const db = await testDatabase();
   const clock = { now: () => new Date("2026-10-13T10:00:00Z") };
+  service = new QuoteService(db, catalog, clock);
   app = buildApp({
-    service: new QuoteService(db, catalog, clock),
+    service,
     catalog,
-    auth: jwtAuthenticator({ issuer, audience, key: secret }),
+    auth: jwtAuthenticator({ issuer, audience, key: secret, resolveLink: (subject) => service.resolveLink(subject) }),
     now: clock.now,
   });
-  admin = await token({ role: "admin" });
+  admin = await token("admin-1", ["Admin"]);
 });
 
-async function call(method: "GET" | "POST", url: string, bearer?: string, payload?: unknown) {
+async function call(method: "GET" | "POST" | "PUT", url: string, bearer?: string, payload?: unknown) {
   const res = await app.inject({
     method,
     url,
     headers: bearer ? { authorization: `Bearer ${bearer}` } : {},
     ...(payload !== undefined && { payload: payload as object }),
   });
-  return { status: res.statusCode, body: res.json() };
+  return { status: res.statusCode, body: res.body ? res.json() : undefined };
 }
 
+/** Admin creates the broker firm and links a signed-in user to it. */
 async function onboardBroker(fspNumber = "51234") {
   const broker = (await call("POST", "/brokers", admin, { name: "Leetile Brokers", fspNumber })).body;
-  return { broker, bearer: await token({ role: "broker", broker_id: broker.id }) };
+  const user = `broker-user-${fspNumber}`;
+  expect((await call("PUT", "/user-links", admin, { subject: user, brokerId: broker.id })).status).toBe(204);
+  return { broker, bearer: await token(user, ["Broker"]) };
 }
 
 const quoteBody = (clientId: string, risk: Record<string, unknown> = cleanRisk) => ({
@@ -64,9 +70,22 @@ describe("authentication", () => {
     expect((await call("GET", "/health")).status).toBe(200);
     expect((await call("GET", "/quotes")).status).toBe(401);
     expect((await call("GET", "/quotes", "not-a-jwt")).status).toBe(401);
-    expect((await call("GET", "/quotes", await token({ role: "broker", broker_id: "b" }, { aud: "other" }))).status).toBe(401);
-    expect((await call("GET", "/quotes", await token({ role: "broker", broker_id: "b" }, { expiresIn: "-1m" }))).status).toBe(401);
-    expect((await call("GET", "/quotes", await token({ role: "broker" }))).body.error).toMatch(/broker_id/);
+    expect((await call("GET", "/quotes", await token("u", ["Broker"], { aud: "other" }))).status).toBe(401);
+    expect((await call("GET", "/quotes", await token("u", ["Broker"], { expiresIn: "-1m" }))).status).toBe(401);
+  });
+
+  it("refuses signed-in users with no role or no link yet", async () => {
+    expect(await call("GET", "/quotes", await token("u", []))).toMatchObject({ status: 403, body: { error: expect.stringMatching(/no Broker/) } });
+    expect(await call("GET", "/quotes", await token("unlinked", ["Broker"]))).toMatchObject({
+      status: 403,
+      body: { error: expect.stringMatching(/not linked to a broker/) },
+    });
+  });
+
+  it("only lets admins link users", async () => {
+    const { broker, bearer } = await onboardBroker();
+    expect((await call("PUT", "/user-links", bearer, { subject: "x", brokerId: broker.id })).status).toBe(403);
+    expect((await call("PUT", "/user-links", admin, { subject: "x", brokerId: "missing" })).status).toBe(404);
   });
 
   it("keeps each role to its own routes", async () => {
@@ -126,7 +145,8 @@ describe("referral journey", () => {
   it("routes a referral to the insurer's underwriter and back to the broker", async () => {
     const { bearer } = await onboardBroker();
     const uw = (await call("POST", "/underwriters", admin, { name: "Senior UW", insurer: "Example Insurer A", authority: 2 })).body;
-    const uwBearer = await token({ role: "underwriter", underwriter_id: uw.id });
+    await call("PUT", "/user-links", admin, { subject: "uw-user", underwriterId: uw.id });
+    const uwBearer = await token("uw-user", ["Underwriter"]);
     const client = (await call("POST", "/clients", bearer, { name: "Client" })).body;
     const risk = { ...cleanRisk, driver: { ...cleanRisk.driver, claimsLast3Years: 3 } };
     const quote = (await call("POST", "/quotes", bearer, quoteBody(client.id, risk))).body;
