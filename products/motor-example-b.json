@@ -1,6 +1,7 @@
 {
   "id": "example-b-motor",
   "insurer": "Example Insurer B",
+  "insurerDetails": { "registeredName": "Example Insurer B Limited (fictional)", "fspNumber": "99902" },
   "line": "motor",
   "name": "Private Motor (illustrative rates, not a real insurer)",
   "version": 1,

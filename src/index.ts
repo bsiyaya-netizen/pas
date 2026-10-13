@@ -19,6 +19,9 @@ export {
 } from "./quote/quote.js";
 export type { NewQuote, OptionStatus, Quote, QuoteOption, Referral } from "./quote/quote.js";
 export { versionOn } from "./policy/policy.js";
+export { currentCover, formatDate, formatRand, policyDocument } from "./documents/policy-document.js";
+export type { DocumentParties, PolicyDocument } from "./documents/policy-document.js";
+export { renderCertificate, renderSchedule } from "./documents/render.js";
 export type { Policy, PolicyTerm, PolicyTransaction, PolicyVersion } from "./policy/policy.js";
 export { isValidFspNumber } from "./parties.js";
 export type { Broker, Client, Underwriter } from "./parties.js";

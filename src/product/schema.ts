@@ -121,6 +121,13 @@ export const ProductSchema = z
   .object({
     id: z.string().min(1),
     insurer: z.string().min(1),
+    /** Shown on policy documents; the FSCA licence of the insurer carrying the risk. */
+    insurerDetails: z
+      .object({
+        registeredName: z.string().min(1),
+        fspNumber: z.string().regex(/^\d{1,6}$/),
+      })
+      .optional(),
     line: z.enum(LINES),
     name: z.string().min(1),
     version: z.number().int().positive(),
