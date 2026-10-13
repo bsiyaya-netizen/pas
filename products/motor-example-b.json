@@ -255,5 +255,50 @@
         }
       ]
     }
-  ]
+  ],
+  "underwriting": {
+    "rules": [
+      {
+        "id": "vehicle-value-max",
+        "message": "Vehicle value above R1 000 000 is outside this product",
+        "outcome": "decline",
+        "when": {
+          "field": "vehicle.value",
+          "op": "gt",
+          "value": 1000000
+        }
+      },
+      {
+        "id": "claims-2-in-3",
+        "message": "Two or more claims in the last 3 years",
+        "outcome": "refer",
+        "authority": 1,
+        "when": {
+          "field": "driver.claimsLast3Years",
+          "op": "gte",
+          "value": 2
+        }
+      },
+      {
+        "id": "premium-over-3000",
+        "message": "Monthly premium above R3 000",
+        "outcome": "refer",
+        "authority": 2,
+        "when": {
+          "field": "$premium",
+          "op": "gt",
+          "value": 3000
+        }
+      },
+      {
+        "id": "licence-date-missing",
+        "message": "Licence issue date not captured",
+        "outcome": "warn",
+        "when": {
+          "field": "driver.licenceDate",
+          "op": "missing"
+        }
+      }
+    ]
+  }
 }

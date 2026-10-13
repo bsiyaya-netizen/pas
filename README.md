@@ -3,9 +3,9 @@
 Policy Administration System for a South African short-term insurance broker:
 motor, home and commercial property, quoted across several insurers.
 
-This first slice is the **product model and rating engine**. Later slices add
-quotes and binding, underwriting referrals, documents, endorsements,
-cancellations and renewals (see the design doc).
+Built so far: the **product model and rating engine**, and **quote, referral
+and bind**. Later slices add documents, endorsements, cancellations and
+renewals (see the design doc).
 
 ## How rating works
 
@@ -20,6 +20,19 @@ cancellations and renewals (see the design doc).
 - `compareInsurers(catalog, line, date, request)` prices one risk with every
   insurer offering that line, cheapest first, and explains any insurer that
   could not price it.
+
+## How a quote becomes a policy
+
+1. `createQuote` prices the risk with every insurer and runs each insurer's
+   underwriting rules (from its product file). Each option is bindable,
+   needs referral, declined, or unpriceable. Quotes are valid for 30 days.
+2. A referred option goes to the insurer's underwriters with `referOption`.
+   `decideReferral` records approve or decline, with a note, and only from an
+   underwriter whose authority grade covers every rule that fired.
+3. `bindQuote` lets the broker who owns the quote bind a bindable option. It
+   issues a policy with term 1, version 1 and a new-business transaction.
+
+These are pure functions over plain objects; storage comes in a later slice.
 
 The two products in `products/` are **illustrative only**: fictional insurers
 and made-up rates, used for tests.

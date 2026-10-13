@@ -72,6 +72,51 @@ const Coverage = z.object({
   steps: z.array(Step).min(1),
 });
 
+/**
+ * One test inside an underwriting rule. `field` is a dotted path into the risk
+ * data, or "$premium" for the quoted monthly premium in rand (VAT included).
+ */
+const Comparison = z
+  .object({
+    field: z.string().min(1),
+    op: z.enum(["eq", "ne", "lt", "lte", "gt", "gte", "in", "missing"]),
+    value: z.union([z.string(), z.number(), z.boolean(), z.array(z.union([z.string(), z.number()]))]).optional(),
+  })
+  .strict()
+  .refine((c) => c.op === "missing" || c.value !== undefined, {
+    message: "value is required unless op is \"missing\"",
+  })
+  .refine((c) => (c.op === "in") === Array.isArray(c.value) || c.op === "missing", {
+    message: "op \"in\" takes a list; other ops take a single value",
+  });
+
+export type Condition =
+  | z.infer<typeof Comparison>
+  | { all: Condition[] }
+  | { any: Condition[] };
+
+const Condition: z.ZodType<Condition> = z.lazy(() =>
+  z.union([
+    Comparison,
+    z.object({ all: z.array(Condition).min(1) }).strict(),
+    z.object({ any: z.array(Condition).min(1) }).strict(),
+  ]),
+);
+
+const UnderwritingRule = z
+  .object({
+    id: z.string().min(1),
+    /** Shown to the broker and underwriter when the rule fires. */
+    message: z.string().min(1),
+    outcome: z.enum(["decline", "refer", "warn"]),
+    /** Authority grade an underwriter needs to clear a referral (1 = junior). */
+    authority: z.number().int().positive().optional(),
+    when: Condition,
+  })
+  .refine((r) => (r.outcome === "refer") === (r.authority !== undefined), {
+    message: "authority is required for refer rules and only allowed on them",
+  });
+
 export const ProductSchema = z
   .object({
     id: z.string().min(1),
@@ -98,6 +143,7 @@ export const ProductSchema = z
     minimumPremium: z.number().min(0).default(0),
     tables: z.record(RateTable),
     coverages: z.array(Coverage).min(1),
+    underwriting: z.object({ rules: z.array(UnderwritingRule) }).default({ rules: [] }),
   })
   .superRefine((product, ctx) => {
     const codes = new Set<string>();
@@ -133,6 +179,17 @@ export const ProductSchema = z
         }
       });
     });
+    const ruleIds = new Set<string>();
+    product.underwriting.rules.forEach((rule, ri) => {
+      if (ruleIds.has(rule.id)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["underwriting", "rules", ri, "id"],
+          message: `Duplicate rule id "${rule.id}"`,
+        });
+      }
+      ruleIds.add(rule.id);
+    });
     for (const code of product.commission.excludedCoverages) {
       if (!codes.has(code)) {
         ctx.addIssue({
@@ -148,6 +205,7 @@ export type Product = z.infer<typeof ProductSchema>;
 export type RateTable = z.infer<typeof RateTable>;
 export type Step = z.infer<typeof Step>;
 export type Operand = z.infer<typeof Operand>;
+export type UnderwritingRule = z.infer<typeof UnderwritingRule>;
 
 /** Validates product data, throwing one readable line per problem. */
 export function parseProduct(data: unknown): Product {
